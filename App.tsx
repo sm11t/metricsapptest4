@@ -1,21 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Platform,
-  SafeAreaView,
-  View,
-  Text,
-  ScrollView,
-  Button,
-  ActivityIndicator,
-  Alert,
+  Platform, SafeAreaView, View, Text, ScrollView, Button,
+  ActivityIndicator, Alert, StyleSheet
 } from 'react-native';
 import AppleHealthKit, { HealthKitPermissions } from 'react-native-health';
 
 type HRSample = { startDate: string; value: number; unit?: string };
 
 const HK = AppleHealthKit.Constants.Permissions;
-
-// Build the read list defensively; remove any undefined entries.
 const READ_TYPES = [
   HK.HeartRate,
   HK.RestingHeartRate,
@@ -25,9 +17,7 @@ const READ_TYPES = [
   HK.MindfulSession,
 ].filter(Boolean);
 
-const perms: HealthKitPermissions = {
-  permissions: { read: READ_TYPES as any, write: [] },
-};
+const perms: HealthKitPermissions = { permissions: { read: READ_TYPES as any, write: [] } };
 
 export default function App() {
   const [initializing, setInitializing] = useState(true);
@@ -37,7 +27,7 @@ export default function App() {
   const [hr, setHr] = useState<HRSample[]>([]);
   const didInit = useRef(false);
 
-  // Authorize on launch, then auto-import HR
+  // Ask for Health access on first mount
   useEffect(() => {
     if (Platform.OS !== 'ios') {
       setInitializing(false);
@@ -54,11 +44,17 @@ export default function App() {
         setMsg('Health permission not granted. Tap “Grant Health Access” to try again.');
         return;
       }
-      setHkReady(true);
-      setMsg('Health access granted. Importing heart rate…');
-      importHeartRate(30);
+      setHkReady(true);            // don’t call import here (avoids race)
+      setMsg('Health access granted.');
     });
   }, []);
+
+  // Auto-import once AFTER hkReady becomes true (solves the race)
+  useEffect(() => {
+    if (hkReady) {
+      importHeartRate(30);
+    }
+  }, [hkReady]);
 
   const importHeartRate = (daysBack = 30) => {
     if (!hkReady) {
@@ -67,7 +63,6 @@ export default function App() {
     }
     const end = new Date();
     const start = new Date(end.getTime() - daysBack * 24 * 60 * 60 * 1000);
-
     const options = {
       startDate: start.toISOString(),
       endDate: end.toISOString(),
@@ -77,7 +72,6 @@ export default function App() {
 
     setLoading(true);
     setMsg(`Importing heart rate (last ${daysBack} days)…`);
-
     AppleHealthKit.getHeartRateSamples(options, (err, results: any[] = []) => {
       setLoading(false);
       if (err) {
@@ -86,10 +80,8 @@ export default function App() {
         setMsg(`Error loading heart rate: ${String(err)}`);
         return;
       }
-      const samples: HRSample[] = results.map((r) => ({
-        startDate: r.startDate,
-        value: r.value,
-        unit: r.unit || 'bpm',
+      const samples: HRSample[] = results.map(r => ({
+        startDate: r.startDate, value: r.value, unit: r.unit || 'bpm'
       }));
       setHr(samples);
       setMsg(
@@ -97,6 +89,7 @@ export default function App() {
           ? `Imported ${samples.length} heart-rate samples from the last ${daysBack} days.`
           : `No heart-rate samples found in the last ${daysBack} days.`
       );
+      console.log('HR sample preview:', samples.slice(0, 5));
     });
   };
 
@@ -111,22 +104,19 @@ export default function App() {
         return;
       }
       setHkReady(true);
-      setMsg('Health access granted. Importing heart rate…');
-      importHeartRate(30);
+      setMsg('Health access granted.');
     });
   };
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-        <Text style={{ fontSize: 22, fontWeight: '700', marginBottom: 8 }}>Heart Activity</Text>
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+    <SafeAreaView style={styles.root}>
+      <View style={styles.header}>
+        <Text style={styles.h1}>Heart Activity</Text>
+        <View style={styles.row}>
           {(initializing || loading) && <ActivityIndicator />}
-          <Text>{msg}</Text>
+          <Text style={styles.msg}>{msg}</Text>
         </View>
-
-        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+        <View style={styles.row}>
           {Platform.OS === 'ios' && !hkReady ? (
             <Button
               title={initializing ? 'Requesting Health Access…' : 'Grant Health Access'}
@@ -135,46 +125,43 @@ export default function App() {
             />
           ) : (
             <>
-              <Button
-                title="Refresh (30 days)"
-                onPress={() => importHeartRate(30)}
-                disabled={loading || !hkReady}
-              />
-              <Button
-                title="Load 90 days"
-                onPress={() => importHeartRate(90)}
-                disabled={loading || !hkReady}
-              />
+              <Button title="Refresh (30 days)" onPress={() => importHeartRate(30)} disabled={loading} />
+              <View style={{ width: 12 }} />
+              <Button title="Load 90 days" onPress={() => importHeartRate(90)} disabled={loading} />
             </>
           )}
         </View>
       </View>
 
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
-      >
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}>
         {Platform.OS !== 'ios' ? (
-          <Text>Apple Health is iOS-only. Build to an iPhone to test.</Text>
+          <Text style={styles.text}>Apple Health is iOS-only. Build to an iPhone to test.</Text>
         ) : (
           <>
-            {hr.slice(0, 200).map((s, i) => {
-              const when = new Date(s.startDate).toLocaleString();
-              return (
-                <Text key={`${s.startDate}-${i}`} style={{ marginBottom: 4 }}>
-                  {when} — {s.value} {s.unit || 'bpm'}
-                </Text>
-              );
-            })}
-            {hkReady && !loading && hr.length === 0 ? (
-              <Text style={{ marginTop: 8, fontStyle: 'italic' }}>
-                Tip: No HR yet? Health app → Browse → Heart → Heart Rate → “+” to add a sample,
+            {hr.slice(0, 200).map((s, i) => (
+              <Text key={`${s.startDate}-${i}`} style={styles.text}>
+                {new Date(s.startDate).toLocaleString()} — {s.value} {s.unit || 'bpm'}
+              </Text>
+            ))}
+            {hkReady && !loading && hr.length === 0 && (
+              <Text style={[styles.text, { fontStyle: 'italic', marginTop: 8 }]}>
+                No samples found. In Health → Browse → Heart → Heart Rate → “+”, add a couple of entries,
                 then tap Refresh.
               </Text>
-            ) : null}
+            )}
           </>
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#0b0b0b' },
+  header: { paddingHorizontal: 16, paddingTop: 12 },
+  h1: { color: '#ffffff', fontSize: 22, fontWeight: '700', marginBottom: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  msg: { color: '#cfcfcf', marginLeft: 8, flexShrink: 1 },
+  list: { paddingHorizontal: 16, paddingBottom: 24 },
+  text: { color: '#ffffff', marginBottom: 6 },
+});
