@@ -33,6 +33,12 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
+	<key>Privacy – Health Share Usage Description</key>
+	<string>This app reads your heart rate to show trends from your yoga practice.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>This app reads your heart rate (and related metrics) to show activity trends.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>This app may write mindfulness minutes and other data you choose to log.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
