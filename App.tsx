@@ -1,351 +1,246 @@
 import 'react-native-gesture-handler';
-import React, {
-  useEffect, useMemo, useRef, useState, createContext, useContext,
-} from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  Platform, SafeAreaView, View, Text, ScrollView, Button,
-  ActivityIndicator, StyleSheet, Pressable, Alert,
+  Platform, SafeAreaView, View, Text, ScrollView, Pressable, StyleSheet, Dimensions,
 } from 'react-native';
-import AppleHealthKit, { HealthKitPermissions } from 'react-native-health';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LineChart } from 'react-native-gifted-charts';
+import { useHeartRate } from './src/features/heart-rate/useHeartRate';
 
-type HRSample = { startDate: string; value: number };
-type HRPoint = { value: number; label?: string }; // for chart
-type HRContextType = { samples: HRSample[]; refresh: (daysBack?: number) => void; loading: boolean; };
-const HRContext = createContext<HRContextType>({ samples: [], refresh: () => {}, loading: false });
-const useHR = () => useContext(HRContext);
+const Line: any = LineChart;
 
-// ----- helpers -----
-const msPerMin = 60_000;
+type HRPoint = { value: number };
+
+const { width: SCREEN_W } = Dimensions.get('window');
+const PAD_H = 16;
+const GAP = 12;
+const CARD = Math.floor((SCREEN_W - PAD_H * 2 - GAP) / 2); // two-up grid ready
+const CHART_H = Math.round(CARD * 0.5);
+
+// ---------- small badge ----------
+function BadgeChip({ label }: { label: 'RECOVER' | 'MAINTAIN' | 'TRAIN' }) {
+  const color = label === 'RECOVER' ? '#ef4444' : label === 'TRAIN' ? '#22c55e' : '#f59e0b';
+  return (
+    <View style={[styles.badge, { borderColor: color, backgroundColor: color + '22' }]}>
+      <Text style={[styles.badgeText, { color }]}>{label}</Text>
+    </View>
+  );
+}
+
+// ---------- helpers ----------
+const nowMs = () => Date.now();
 const toMs = (iso: string) => new Date(iso).getTime();
-const startOfDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const mean = (a: number[]) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN);
 
-function fmtTime(ts: number, granularityMin: number) {
-  const d = new Date(ts);
-  // short label based on bucket size
-  if (granularityMin >= 1440) return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  if (granularityMin >= 60)   return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric' });
-  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-}
+// Build a minute-level series for the last `mins` minutes.
+// If not enough points, fall back to a flat line at the recent average.
+function lastMinutesSeries(
+  samples: { ts: string; bpm: number }[],
+  mins = 30
+): { data: HRPoint[]; avg?: number; min?: number; max?: number } {
+  const end = nowMs();
+  const start = end - mins * 60_000;
+  const recent = samples.filter(s => {
+    const t = toMs(s.ts);
+    return t >= start && t <= end && Number.isFinite(s.bpm);
+  });
+  const vals = recent.map(r => r.bpm).filter(Number.isFinite);
+  const avg = mean(vals);
+  const safeAvg = Number.isFinite(avg) ? avg : 60;
 
-function bucketAvg(
-  samples: HRSample[],
-  start: Date,
-  end: Date,
-  bucketMinutes: number
-): Array<{ ts: number; value: number }> {
-  const startMs = start.getTime(), endMs = end.getTime();
-  const size = Math.max(1, Math.ceil((endMs - startMs) / (bucketMinutes * msPerMin)));
-  const bins = Array.from({ length: size }, (_, i) => ({ t: startMs + i * bucketMinutes * msPerMin, sum: 0, n: 0 }));
-  for (const s of samples) {
-    const t = toMs(s.startDate);
-    if (t < startMs || t >= endMs) continue;
-    const idx = Math.min(bins.length - 1, Math.floor((t - startMs) / (bucketMinutes * msPerMin)));
-    bins[idx].sum += s.value; bins[idx].n += 1;
+  // dedupe identical timestamps, simple smoothing via 1-min bin
+  const buckets = new Map<number, number[]>();
+  for (const r of recent) {
+    const m = Math.floor(toMs(r.ts) / 60_000) * 60_000;
+    const arr = buckets.get(m) ?? [];
+    arr.push(r.bpm);
+    buckets.set(m, arr);
   }
-  return bins.map(b => ({ ts: b.t, value: b.n ? b.sum / b.n : NaN })).filter(p => !Number.isNaN(p.value));
+  const points = [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([t, arr]) => ({ t, v: mean(arr) }));
+
+  let data: HRPoint[];
+  if (points.length >= 2) {
+    data = points.map(p => ({ value: p.v }));
+  } else {
+    // safe fallback (prevents Infinity/NaN chart crashes)
+    data = [{ value: safeAvg }, { value: safeAvg }];
+  }
+  const min = vals.length ? Math.min(...vals) : safeAvg;
+  const max = vals.length ? Math.max(...vals) : safeAvg;
+  return { data, avg, min, max };
 }
 
-function downsample<T>(arr: T[], maxPoints = 400) {
-  if (arr.length <= maxPoints) return arr;
-  const step = Math.ceil(arr.length / maxPoints);
-  const out: T[] = [];
-  for (let i = 0; i < arr.length; i += step) out.push(arr[i]);
-  return out;
+// ---------- compact HR card ----------
+function HeartRateSquare({
+  onPress,
+  samples,
+  badge,
+}: {
+  onPress: () => void;
+  samples: { ts: string; bpm: number }[];
+  badge?: { badge: 'RECOVER' | 'MAINTAIN' | 'TRAIN'; reason: string };
+}) {
+  const { data, avg, min, max } = useMemo(() => lastMinutesSeries(samples, 30), [samples]);
+
+  const avgDisplay =
+    Number.isFinite(avg as number) ? Math.round(avg as number).toString() : '—';
+  const sub =
+    Number.isFinite(min as number) && Number.isFinite(max as number)
+      ? `min ${Math.round(min as number)} · max ${Math.round(max as number)}`
+      : '—';
+
+  return (
+    <Pressable style={styles.square} onPress={onPress}>
+      <View style={styles.squareTop}>
+        <Text style={styles.squareTitle}>Heart</Text>
+        {badge && <BadgeChip label={badge.badge} />}
+      </View>
+
+      <View style={styles.squareCenter}>
+        <Text numberOfLines={1} style={styles.squareBig}>
+          {avgDisplay}
+        </Text>
+        <Text style={styles.squareUnit}>bpm</Text>
+      </View>
+
+      <Text style={styles.squareSub} numberOfLines={1}>{sub}</Text>
+
+      {/* flowing area chart in bottom half */}
+      <View style={styles.squareChart}>
+        <Line
+          areaChart
+          curved
+          hideDataPoints
+          data={data}
+          thickness={2}
+          startFillColor="#f59e0b33"
+          endFillColor="#f59e0b06"
+          color="#f59e0b"
+          startOpacity={1}
+          endOpacity={0}
+          yAxisLabelWidth={0}
+          xAxisThickness={0}
+          yAxisThickness={0}
+          noOfSections={3}             // subtle grid
+          rulesType="dashed"
+          rulesColor="#ffffff16"
+        />
+      </View>
+    </Pressable>
+  );
 }
 
-function statsToday(samples: HRSample[]) {
-  const s = startOfDay(), e = new Date();
-  const values = samples.filter(x => {
-    const t = toMs(x.startDate);
-    return t >= s.getTime() && t <= e.getTime();
-  }).map(x => x.value);
-  if (!values.length) return { avg: 0, min: 0, max: 0, count: 0 };
-  const sum = values.reduce((a, b) => a + b, 0);
-  return { avg: sum / values.length, min: Math.min(...values), max: Math.max(...values), count: values.length };
-}
-
-// ----- Health perms (defensive) -----
-const HK = AppleHealthKit.Constants.Permissions;
-const READ_TYPES = [
-  HK.HeartRate,
-  HK.RestingHeartRate,
-  HK.HeartRateVariabilitySDNN ?? (HK as any).HeartRateVariability,
-  HK.SleepAnalysis,
-  HK.RespiratoryRate,
-  HK.MindfulSession,
-].filter(Boolean);
-const perms: HealthKitPermissions = { permissions: { read: READ_TYPES as any, write: [] } };
-
-// ----- Overview (card + sparkline) -----
+// ---------- overview ----------
 function OverviewScreen({ navigation }: any) {
-  const { samples, refresh, loading } = useHR();
-  const today = statsToday(samples);
+  const { loading, samples, badge, refresh } = useHeartRate(365);
 
-  const now = new Date();
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-  const spark: HRPoint[] = useMemo(() => {
-    const pts = bucketAvg(samples, sevenDaysAgo, now, 60 * 24); // daily
-    const ds = downsample(pts, 60);
-    return ds.map(p => ({ value: p.value }));
-  }, [samples]);
-
-  const total = samples.length;
-  const last = total ? new Date(samples[total - 1].startDate).toLocaleString() : '—';
+  // last update status from most recent sample
+  const lastTs = samples.length ? new Date(samples[samples.length - 1].ts) : undefined;
+  const status = loading
+    ? 'Updating from Health…'
+    : lastTs
+    ? `Updated ${lastTs.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : '—';
 
   return (
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.h1}>Activity</Text>
+        {/* Header row with refresh */}
+        <View style={styles.headerRow}>
+          <Text style={styles.h1}>Activity</Text>
+          <Pressable style={styles.refreshBtn} onPress={() => refresh(365)} disabled={loading}>
+            <Text style={[styles.refreshText, loading && { opacity: 0.6 }]}>
+              {loading ? 'Refreshing…' : 'Refresh'}
+            </Text>
+          </Pressable>
+        </View>
+        <Text style={styles.statusText}>{status}</Text>
 
-        <Pressable style={styles.card} onPress={() => navigation.navigate('HRDetail')}>
-          <View style={styles.cardTopRow}>
-            <Text style={styles.cardTitle}>Heart Rate</Text>
-            <Button title="Refresh" onPress={() => refresh(365)} disabled={loading} />
-          </View>
-
-          <Text style={styles.cardBig}>
-            {today.count ? `${Math.round(today.avg)} bpm` : '--'}
-          </Text>
-          <Text style={styles.cardSub}>
-            {today.count ? `Today · min ${Math.round(today.min)} / max ${Math.round(today.max)}` : 'No samples today'}
-          </Text>
-
-          <View style={styles.chartBox}>
-            <LineChart
-              areaChart
-              curved
-              hideDataPoints
-              data={spark}
-              thickness={2}
-              startFillColor="#f59e0b33"
-              endFillColor="#f59e0b06"
-              color="#f59e0b"
-              startOpacity={1}
-              endOpacity={0}
-              yAxisLabelWidth={0}
-              xAxisThickness={0}
-              yAxisThickness={0}
-              noOfSections={4}
-              rulesType="dashed"
-              rulesColor="#ffffff22"
-            />
-          </View>
-
-          {/* diagnostics below the chart so it never overlaps */}
-          <Text style={[styles.cardSub, { marginTop: 8 }]}>
-            Loaded: {total} samples · Last: {last}
-          </Text>
-        </Pressable>
-
-        {loading && (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator />
-            <Text style={styles.msg}>Updating from Health…</Text>
-          </View>
-        )}
+        <View style={styles.grid}>
+          <HeartRateSquare
+            onPress={() => navigation.navigate('HRDetail')}
+            samples={samples}
+            badge={badge}
+          />
+          {/* add more squares later */}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ----- Detail (interactive chart with pointer) -----
+// ---------- simple detail placeholder (kept for navigation) ----------
 function HRDetailScreen() {
-  const { samples, refresh, loading } = useHR();
-  const [range, setRange] = useState<'1D' | '3D' | '7D' | '30D' | '90D'>('7D');
-
-  const { points, label, bucket } = useMemo(() => {
-    const now = new Date();
-    const days = range === '1D' ? 1 : range === '3D' ? 3 : range === '7D' ? 7 : range === '30D' ? 30 : 90;
-    const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    const bucket =
-      range === '1D' ? 5 :
-      range === '3D' ? 15 :
-      range === '7D' ? 60 :
-      range === '30D' ? 120 : 1440;
-    const pts = bucketAvg(samples, start, now, bucket);
-    const ds = downsample(pts, 600);
-    const withLabels: HRPoint[] = ds.map(p => ({ value: p.value, label: fmtTime(p.ts, bucket) }));
-    return { points: withLabels, label: `${range} · bucket ${bucket}m`, bucket };
-  }, [samples, range]);
-
   return (
     <SafeAreaView style={styles.root}>
-      <View style={styles.container}>
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', height: 240 }]}>
         <Text style={styles.h1}>Heart Rate</Text>
-
-        <View style={styles.seg}>
-          {(['1D','3D','7D','30D','90D'] as const).map(k => (
-            <Pressable key={k} onPress={() => setRange(k)} style={[styles.segBtn, range === k && styles.segBtnActive]}>
-              <Text style={[styles.segText, range === k && styles.segTextActive]}>{k}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Text style={[styles.msg, { marginBottom: 8 }]}>{label}</Text>
-
-        <View style={styles.chartTall}>
-          <LineChart
-            areaChart
-            curved
-            data={points}
-            thickness={2}
-            startFillColor="#f59e0b33"
-            endFillColor="#f59e0b06"
-            color="#f59e0b"
-            startOpacity={1}
-            endOpacity={0}
-            yAxisLabelWidth={0}
-            xAxisThickness={0}
-            yAxisThickness={0}
-            noOfSections={5}
-            rulesType="dashed"
-            rulesColor="#ffffff22"
-            // show small round data points
-            showDataPoints
-            dataPointsColor="#f59e0b"
-            dataPointsRadius={3}
-            // interactive crosshair + label
-            focusEnabled
-            pointerConfig={{
-              pointerStripUptoDataPoint: true,
-              pointerStripColor: '#f59e0b66',
-              pointerStripWidth: 2,
-              radius: 4,
-              pointerColor: '#f59e0b',
-              showPointerStrip: true,
-              // label bubble
-              pointerLabelWidth: 90,
-              pointerLabelHeight: 48,
-              pointerLabelComponent: (items: any[]) => {
-                const it = items?.[0];
-                const v = it?.value ? Math.round(it.value) : '--';
-                const when = it?.label ?? '';
-                return (
-                  <View style={styles.tooltip}>
-                    <Text style={styles.tooltipValue}>{v} bpm</Text>
-                    <Text style={styles.tooltipWhen}>{when}</Text>
-                  </View>
-                );
-              },
-            }}
-          />
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-          <Button title="Refresh (30d)" onPress={() => refresh(30)} disabled={loading} />
-          <Button title="Refresh (365d)" onPress={() => refresh(365)} disabled={loading} />
-        </View>
+        <Text style={{ color: '#cfcfcf' }}>Detailed view coming next.</Text>
       </View>
     </SafeAreaView>
   );
 }
 
-// ----- App shell & data provider -----
 const Stack = createNativeStackNavigator();
 
 export default function App() {
-  const [initializing, setInitializing] = useState(true);
-  const [authorized, setAuthorized] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [samples, setSamples] = useState<HRSample[]>([]);
-  const didInit = useRef(false);
-
-  useEffect(() => {
-    if (Platform.OS !== 'ios') { setInitializing(false); return; }
-    if (didInit.current) return; didInit.current = true;
-
-    AppleHealthKit.initHealthKit(perms, (err) => {
-      setInitializing(false);
-      if (err) {
-        setAuthorized(false);
-        Alert.alert('Health Access', 'Please enable “Heart Rate” in Health → Profile → Apps → metricsapptest4.');
-        return;
-      }
-      setAuthorized(true);
-    });
-  }, []);
-
-  useEffect(() => { if (authorized) refresh(365); }, [authorized]);
-
-  const refresh = (daysBack = 30) => {
-    if (!authorized) return;
-    const end = new Date();
-    const start = new Date(end.getTime() - daysBack * 24 * 60 * 60 * 1000);
-    const options = { startDate: start.toISOString(), endDate: end.toISOString(), ascending: false, limit: 10000 };
-
-    setLoading(true);
-    AppleHealthKit.getHeartRateSamples(options, (err, results: any[] = []) => {
-      setLoading(false);
-      if (err) { console.error('getHeartRateSamples error', err); Alert.alert('Health Error', String(err)); setSamples([]); return; }
-      const list: HRSample[] = results.map(r => ({ startDate: r.startDate, value: Number(r.value) || 0 }));
-      list.sort((a, b) => toMs(a.startDate) - toMs(b.startDate));
-      setSamples(list);
-      console.log(`Loaded ${list.length} HR samples. First: ${list[0]?.startDate ?? '—'}  Last: ${list[list.length-1]?.startDate ?? '—'}`);
-    });
-  };
-
-  const value = useMemo(() => ({ samples, refresh, loading }), [samples, loading]);
-
   if (Platform.OS !== 'ios') {
-    return <SafeAreaView style={styles.root}><View style={styles.container}><Text style={styles.h1}>iOS only for Apple Health</Text></View></SafeAreaView>;
+    return (
+      <SafeAreaView style={styles.root}>
+        <View style={styles.container}><Text style={styles.h1}>iOS only for Apple Health</Text></View>
+      </SafeAreaView>
+    );
   }
-
-  if (initializing) {
-    return <SafeAreaView style={styles.root}><View style={styles.container}><ActivityIndicator /><Text style={styles.msg}>Requesting Health access…</Text></View></SafeAreaView>;
-  }
-
   return (
-    <HRContext.Provider value={value}>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#0b0b0b' }, headerTintColor: '#fff' }}>
-          <Stack.Screen name="Overview" component={OverviewScreen} options={{ title: 'Activity' }} />
-          <Stack.Screen name="HRDetail" component={HRDetailScreen} options={{ title: 'Heart Rate' }} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </HRContext.Provider>
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#0b0b0b' }, headerTintColor: '#fff' }}>
+        <Stack.Screen name="Overview" component={OverviewScreen} options={{ title: 'Activity' }} />
+        <Stack.Screen name="HRDetail" component={HRDetailScreen} options={{ title: 'Heart Rate' }} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0b0b0b' },
-  container: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 },
-  h1: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 12 },
-  msg: { color: '#cfcfcf' },
-  card: {
+  container: { paddingHorizontal: PAD_H, paddingTop: 12, paddingBottom: 16 },
+
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  h1: { color: '#fff', fontSize: 22, fontWeight: '700' },
+  refreshBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: '#1a1a1a' },
+  refreshText: { color: '#60a5fa', fontWeight: '700' },
+  statusText: { color: '#9ca3af', marginTop: 6, marginBottom: 10 },
+
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
+
+  square: {
+    width: CARD,
+    height: CARD,
     backgroundColor: '#121212',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#1f2937',
-    overflow: 'hidden',         // <-- keeps the chart inside rounded corners
+    padding: 12,
+    overflow: 'hidden',
   },
-  cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardTitle: { color: '#9ca3af', fontSize: 14 },
-  cardBig: { color: '#fff', fontSize: 28, fontWeight: '700', marginTop: 6 },
-  cardSub: { color: '#cfcfcf', marginTop: 4 },
-  chartBox: { height: 120, marginTop: 8 }, // small sparkline
-  chartTall: { height: 260, borderRadius: 12, overflow: 'hidden' },
-  seg: { flexDirection: 'row', backgroundColor: '#171717', padding: 4, borderRadius: 12, marginBottom: 12 },
-  segBtn: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8 },
-  segBtnActive: { backgroundColor: '#f59e0b22' },
-  segText: { color: '#cfcfcf' },
-  segTextActive: { color: '#f59e0b', fontWeight: '700' },
+  squareTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  squareTitle: { color: '#9ca3af', fontSize: 12, fontWeight: '600' },
+  squareCenter: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 6 },
+  squareBig: { color: '#fff', fontSize: 28, fontWeight: '800', marginRight: 6 },
+  squareUnit: { color: '#cfcfcf', marginBottom: 4 },
+  squareSub: { color: '#9ca3af', fontSize: 12, marginTop: 4 },
 
-  // tooltip bubble
-  tooltip: {
-    backgroundColor: '#1f2937',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
+  squareChart: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    right: 10,
+    height: CHART_H,
   },
-  tooltipValue: { color: '#fff', fontWeight: '700' },
-  tooltipWhen: { color: '#cfcfcf', fontSize: 12, marginTop: 2 },
-  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+
+  badge: { paddingVertical: 2, paddingHorizontal: 8, borderRadius: 999, borderWidth: 1 },
+  badgeText: { fontWeight: '700', fontSize: 10, letterSpacing: 0.4 },
 });
