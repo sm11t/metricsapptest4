@@ -19,9 +19,10 @@ export function useHeartRate(daysBackDefault = 90) {
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(false);
   const [samples, setSamples] = useState<HRSample[]>([]);
+  const [lastSyncAt, setLastSyncAt] = useState<number | undefined>(undefined); // NEW
   const didInit = useRef(false);
 
-  // Initialize HealthKit once
+  // init once
   useEffect(() => {
     if (didInit.current) return;
     didInit.current = true;
@@ -34,7 +35,7 @@ export function useHeartRate(daysBackDefault = 90) {
     });
   }, [daysBackDefault]);
 
-  // Fetch samples
+  // fetch
   const refresh = (daysBack = daysBackDefault) => {
     if (!authorized) return;
     const end = new Date();
@@ -49,13 +50,19 @@ export function useHeartRate(daysBackDefault = 90) {
     setLoading(true);
     AppleHealthKit.getHeartRateSamples(options, (err, res: any[] = []) => {
       setLoading(false);
-      if (err) { console.error('getHeartRateSamples', err); setSamples([]); return; }
+      if (err) {
+        console.error('getHeartRateSamples', err);
+        setSamples([]);
+        setLastSyncAt(Date.now()); // still mark sync completion
+        return;
+      }
       const list: HRSample[] = res.map(r => ({ ts: r.startDate, bpm: Number(r.value) || 0 }));
       setSamples(list);
+      setLastSyncAt(Date.now());   // mark when we finished syncing
     });
   };
 
-  // Derivations
+  // ---------- derivations ----------
   const daily = useMemo(() => toDaily(samples), [samples]);
   const baseline = useMemo(() => baseline28(daily), [daily]);
 
@@ -64,9 +71,10 @@ export function useHeartRate(daysBackDefault = 90) {
     () => deltaPct(today?.rhr, baseline[baseline.length - 1]?.baseline),
     [today, baseline]
   );
+
   const badge = useMemo(() => decideBadge(daily, baseline), [daily, baseline]);
 
-  // Sparkline: last 7 daily RHR values
+  // sparkline: last 7 daily RHRs
   const sparkRhr = useMemo(
     () => daily.slice(-7).map(d => d.rhr ?? NaN).filter(n => Number.isFinite(n)),
     [daily]
@@ -83,5 +91,6 @@ export function useHeartRate(daysBackDefault = 90) {
     badge,
     sparkRhr,
     refresh,
+    lastSyncAt, // expose
   };
 }

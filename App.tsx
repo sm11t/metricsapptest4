@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   Platform, SafeAreaView, View, Text, ScrollView, Pressable, StyleSheet, Dimensions,
 } from 'react-native';
@@ -8,17 +8,18 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LineChart } from 'react-native-gifted-charts';
 import { useHeartRate } from './src/features/heart-rate/useHeartRate';
 
+// Gifted Charts types lag sometimes; alias as any so advanced props compile.
 const Line: any = LineChart;
 
-type HRPoint = { value: number };
+type HRPoint = { value: number; dataPointColor?: string; dataPointRadius?: number };
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const PAD_H = 16;
 const GAP = 12;
-const CARD = Math.floor((SCREEN_W - PAD_H * 2 - GAP) / 2); // two-up grid ready
+const CARD = Math.floor((SCREEN_W - PAD_H * 2 - GAP) / 2); // grid-ready square
 const CHART_H = Math.round(CARD * 0.5);
 
-// ---------- small badge ----------
+// ---------- UI bits ----------
 function BadgeChip({ label }: { label: 'RECOVER' | 'MAINTAIN' | 'TRAIN' }) {
   const color = label === 'RECOVER' ? '#ef4444' : label === 'TRAIN' ? '#22c55e' : '#f59e0b';
   return (
@@ -28,52 +29,72 @@ function BadgeChip({ label }: { label: 'RECOVER' | 'MAINTAIN' | 'TRAIN' }) {
   );
 }
 
-// ---------- helpers ----------
-const nowMs = () => Date.now();
+// ---------- math helpers for the 30-minute flow ----------
 const toMs = (iso: string) => new Date(iso).getTime();
 const mean = (a: number[]) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN);
 
-// Build a minute-level series for the last `mins` minutes.
-// If not enough points, fall back to a flat line at the recent average.
-function lastMinutesSeries(
-  samples: { ts: string; bpm: number }[],
-  mins = 30
-): { data: HRPoint[]; avg?: number; min?: number; max?: number } {
-  const end = nowMs();
-  const start = end - mins * 60_000;
-  const recent = samples.filter(s => {
-    const t = toMs(s.ts);
-    return t >= start && t <= end && Number.isFinite(s.bpm);
-  });
-  const vals = recent.map(r => r.bpm).filter(Number.isFinite);
-  const avg = mean(vals);
-  const safeAvg = Number.isFinite(avg) ? avg : 60;
-
-  // dedupe identical timestamps, simple smoothing via 1-min bin
-  const buckets = new Map<number, number[]>();
-  for (const r of recent) {
-    const m = Math.floor(toMs(r.ts) / 60_000) * 60_000;
-    const arr = buckets.get(m) ?? [];
-    arr.push(r.bpm);
-    buckets.set(m, arr);
+// resample known points to N evenly-spaced times (simple linear interpolation)
+function resampleLinear(points: Array<{ t: number; v: number }>, n: number) {
+  if (points.length === 0) return [];
+  if (points.length === 1) return Array.from({ length: n }, (_, i) => ({ t: points[0].t + i, v: points[0].v }));
+  const start = points[0].t;
+  const end = points[points.length - 1].t;
+  const step = (end - start) / (n - 1);
+  const out: Array<{ t: number; v: number }> = [];
+  let j = 0;
+  for (let i = 0; i < n; i++) {
+    const x = start + step * i;
+    while (j < points.length - 2 && points[j + 1].t < x) j++;
+    const p1 = points[j], p2 = points[j + 1];
+    const ratio = (x - p1.t) / Math.max(1, p2.t - p1.t);
+    const y = p1.v + (p2.v - p1.v) * ratio;
+    out.push({ t: x, v: y });
   }
-  const points = [...buckets.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([t, arr]) => ({ t, v: mean(arr) }));
-
-  let data: HRPoint[];
-  if (points.length >= 2) {
-    data = points.map(p => ({ value: p.v }));
-  } else {
-    // safe fallback (prevents Infinity/NaN chart crashes)
-    data = [{ value: safeAvg }, { value: safeAvg }];
-  }
-  const min = vals.length ? Math.min(...vals) : safeAvg;
-  const max = vals.length ? Math.max(...vals) : safeAvg;
-  return { data, avg, min, max };
+  return out;
 }
 
-// ---------- compact HR card ----------
+// Build smooth minute-level series for the *last 30 minutes ending at the latest sample time*.
+function last30MinSeries(samples: { ts: string; bpm: number }[]) {
+  // pick an end time: latest sample if available, otherwise "now"
+  const end = samples.length ? new Date(samples[samples.length - 1].ts).getTime() : Date.now();
+  const start = end - 30 * 60_000;
+
+  // filter window and average by minute to stabilize
+  const mins = new Map<number, number[]>();
+  for (const s of samples) {
+    const t = new Date(s.ts).getTime();
+    if (t < start || t > end || !Number.isFinite(s.bpm)) continue;
+    const m = Math.floor(t / 60_000) * 60_000;
+    const arr = mins.get(m) ?? [];
+    arr.push(s.bpm);
+    mins.set(m, arr);
+  }
+
+  const raw = [...mins.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([t, arr]) => ({ t, v: arr.reduce((s, x) => s + x, 0) / arr.length }))
+    .filter(p => Number.isFinite(p.v));
+
+  // ensure we always have at least two points (prevents NaN/Infinity layout)
+  const series = raw.length ? raw : [{ t: start, v: 60 }, { t: end, v: 60 }];
+
+  // resample to a smooth curve
+  const smooth = resampleLinear(series, 24);
+
+  // LAST point is a small WHITE dot
+  const data: HRPoint[] = smooth.map((p, i) => ({
+    value: p.v,
+    dataPointRadius: i === smooth.length - 1 ? 3 : 0,
+    dataPointColor: i === smooth.length - 1 ? '#ffffff' : 'transparent',
+  }));
+
+  const startLabel = new Date(start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const endLabel   = new Date(end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  return { startLabel, endLabel, data };
+}
+
+// ---------- compact HR tile ----------
 function HeartRateSquare({
   onPress,
   samples,
@@ -83,13 +104,31 @@ function HeartRateSquare({
   samples: { ts: string; bpm: number }[];
   badge?: { badge: 'RECOVER' | 'MAINTAIN' | 'TRAIN'; reason: string };
 }) {
-  const { data, avg, min, max } = useMemo(() => lastMinutesSeries(samples, 30), [samples]);
+  const { data, startLabel, endLabel } = useMemo(() => last30MinSeries(samples), [samples]);
 
-  const avgDisplay =
-    Number.isFinite(avg as number) ? Math.round(avg as number).toString() : '—';
+  // simple avg/min/max over the same 30-min window for the text
+  const stats = useMemo(() => {
+    if (!samples.length) return { avg: NaN, min: NaN, max: NaN };
+    const end = toMs(samples[samples.length - 1].ts);
+    const start = end - 30 * 60_000;
+    const vals = samples
+      .filter(s => {
+        const t = toMs(s.ts);
+        return t >= start && t <= end && Number.isFinite(s.bpm);
+      })
+      .map(s => s.bpm);
+    const avg = mean(vals);
+    return {
+      avg,
+      min: vals.length ? Math.min(...vals) : avg,
+      max: vals.length ? Math.max(...vals) : avg,
+    };
+  }, [samples]);
+
+  const avgDisplay = Number.isFinite(stats.avg) ? Math.round(stats.avg as number).toString() : '—';
   const sub =
-    Number.isFinite(min as number) && Number.isFinite(max as number)
-      ? `min ${Math.round(min as number)} · max ${Math.round(max as number)}`
+    Number.isFinite(stats.min) && Number.isFinite(stats.max)
+      ? `min ${Math.round(stats.min as number)} · max ${Math.round(stats.max as number)}`
       : '—';
 
   return (
@@ -100,55 +139,56 @@ function HeartRateSquare({
       </View>
 
       <View style={styles.squareCenter}>
-        <Text numberOfLines={1} style={styles.squareBig}>
-          {avgDisplay}
-        </Text>
+        <Text numberOfLines={1} style={styles.squareBig}>{avgDisplay}</Text>
         <Text style={styles.squareUnit}>bpm</Text>
       </View>
 
       <Text style={styles.squareSub} numberOfLines={1}>{sub}</Text>
 
-      {/* flowing area chart in bottom half */}
+      {/* flowing curved area chart sits at bottom half */}
       <View style={styles.squareChart}>
         <Line
           areaChart
           curved
-          hideDataPoints
           data={data}
           thickness={2}
-          startFillColor="#f59e0b33"
+          startFillColor="#f59e0b33"  // gradient
           endFillColor="#f59e0b06"
           color="#f59e0b"
           startOpacity={1}
           endOpacity={0}
+          hideRules={false}
+          noOfSections={3}
+          rulesType="dashed"
+          rulesColor="#ffffff16"
           yAxisLabelWidth={0}
           xAxisThickness={0}
           yAxisThickness={0}
-          noOfSections={3}             // subtle grid
-          rulesType="dashed"
-          rulesColor="#ffffff16"
+          showDataPoints     // we control radius/color per-point; only last has radius>0
         />
+        {/* X axis labels */}
+        <View style={styles.xLabelsRow}>
+          <Text style={styles.xLabel}>{startLabel}</Text>
+          <Text style={styles.xLabel}>{endLabel}</Text>
+        </View>
       </View>
     </Pressable>
   );
 }
 
-// ---------- overview ----------
+// ---------- Overview with Refresh ----------
 function OverviewScreen({ navigation }: any) {
-  const { loading, samples, badge, refresh } = useHeartRate(365);
-
-  // last update status from most recent sample
+  const { loading, samples, badge, refresh, lastSyncAt } = useHeartRate(365);
   const lastTs = samples.length ? new Date(samples[samples.length - 1].ts) : undefined;
   const status = loading
-    ? 'Updating from Health…'
-    : lastTs
-    ? `Updated ${lastTs.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    : '—';
+  ? 'Updating from Health…'
+  : lastSyncAt
+  ? `Updated ${new Date(lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+  : '—';
 
   return (
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Header row with refresh */}
         <View style={styles.headerRow}>
           <Text style={styles.h1}>Activity</Text>
           <Pressable style={styles.refreshBtn} onPress={() => refresh(365)} disabled={loading}>
@@ -165,14 +205,13 @@ function OverviewScreen({ navigation }: any) {
             samples={samples}
             badge={badge}
           />
-          {/* add more squares later */}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ---------- simple detail placeholder (kept for navigation) ----------
+// ---------- Simple detail placeholder (we’ll flesh out later) ----------
 function HRDetailScreen() {
   return (
     <SafeAreaView style={styles.root}>
@@ -240,6 +279,16 @@ const styles = StyleSheet.create({
     right: 10,
     height: CHART_H,
   },
+  xLabelsRow: {
+    position: 'absolute',
+    bottom: -2,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 0,
+  },
+  xLabel: { color: '#9ca3af', fontSize: 10 },
 
   badge: { paddingVertical: 2, paddingHorizontal: 8, borderRadius: 999, borderWidth: 1 },
   badgeText: { fontWeight: '700', fontSize: 10, letterSpacing: 0.4 },
