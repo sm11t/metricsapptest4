@@ -49,6 +49,7 @@ export type HRDay = {
 
 // lowest stable 5-min rolling median inside [00:00, 08:00) local (approx until sleep is integrated)
 function computeRHR(minutes: { t: number; bpm: number }[]) {
+  if (!minutes.length) return NaN;
   const d = new Date(minutes[0]?.t ?? Date.now());
   const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0).getTime();
   const end   = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 8, 0).getTime();
@@ -70,7 +71,7 @@ export function toDaily(samples: HRSample[]): HRDay[] {
   const byDay = new Map<string, HRSample[]>();
   for (const s of samples) {
     const d = new Date(s.ts);
-    const key = d.toISOString().slice(0,10); // local-ish; good enough for v1
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     (byDay.get(key) ?? byDay.set(key, []).get(key)!).push(s);
   }
 
