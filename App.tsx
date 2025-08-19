@@ -8,12 +8,15 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LineChart } from 'react-native-gifted-charts';
 import { useHeartRate } from './src/features/heart-rate/useHeartRate';
 import HRDetail from './src/screens/HRDetail';
+import HRVSquare from './src/features/hrv/HRVSquare';
+import HRVDetail from './src/screens/HRVDetail';
 import { resampleLinear } from './src/ui/chartSafe';
 import ReadinessWide from './src/features/readiness/ReadinessWide';
 import ReadinessDetail from './src/screens/ReadinessDetail';
 import { BadgeChip } from './src/ui/BadgeChip';
+import SleepWide from './src/features/sleep/SleepWide';
+import SleepDetail from './src/screens/SleepDetail'
 
-// Gifted Charts types lag sometimes; alias as any so advanced props compile.
 const Line: any = LineChart;
 
 type HRPoint = { value: number; dataPointColor?: string; dataPointRadius?: number };
@@ -21,9 +24,9 @@ type HRPoint = { value: number; dataPointColor?: string; dataPointRadius?: numbe
 const { width: SCREEN_W } = Dimensions.get('window');
 const PAD_H = 16;
 const GAP = 12;
-const CARD = Math.floor((SCREEN_W - PAD_H * 2 - GAP) / 2); // grid-ready square
+const CARD = Math.floor((SCREEN_W - PAD_H * 2 - GAP) / 2);
 const CHART_H = Math.round(CARD * 0.5);
-const CARD_WIDE = CARD * 2 + GAP; // span 2 columns
+const CARD_WIDE = CARD * 2 + GAP;
 
 // ---------- math helpers for the 30-minute flow ----------
 const toMs = (iso: string) => new Date(iso).getTime();
@@ -31,11 +34,9 @@ const mean = (a: number[]) => (a.length ? a.reduce((s, x) => s + x, 0) / a.lengt
 
 // Build smooth minute-level series for the *last 30 minutes ending at the latest sample time*.
 function last30MinSeries(samples: { ts: string; bpm: number }[]) {
-  // end = latest recorded sample; if there’s no data, use now
   const end = samples.length ? new Date(samples[samples.length - 1].ts).getTime() : Date.now();
   const start = end - 30 * 60_000;
 
-  // bucket by minute and average (stabilizes spikes)
   const byMin = new Map<number, number[]>();
   for (const s of samples) {
     const t = new Date(s.ts).getTime();
@@ -49,20 +50,15 @@ function last30MinSeries(samples: { ts: string; bpm: number }[]) {
     .map(([t, arr]) => ({ t, v: arr.reduce((s, x) => s + x, 0) / arr.length }))
     .filter(p => Number.isFinite(p.v));
 
-  // Always at least 2 points so the chart never breaks
   const series = raw.length ? raw : [{ t: start, v: 60 }, { t: end, v: 60 }];
-
-  // Smooth to a nice curve (24 points across 30 min)
   const smooth = resampleLinear(series, 24);
 
-  // white dot on the latest sample (last item)
   const data: HRPoint[] = smooth.map((p, i) => ({
     value: p.v,
     dataPointRadius: i === smooth.length - 1 ? 3 : 0,
     dataPointColor: i === smooth.length - 1 ? '#ffffff' : 'transparent',
   }));
 
-  // safe y-range
   let lo = Math.min(...smooth.map(p => p.v));
   let hi = Math.max(...smooth.map(p => p.v));
   if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi - lo < 1) { lo = 59.5; hi = 60.5; }
@@ -85,7 +81,6 @@ function HeartRateSquare({
 }) {
   const { data, startLabel, endLabel, yMin, yMax } = useMemo(() => last30MinSeries(samples), [samples]);
 
-  // simple avg/min/max over the same 30-min window for the text
   const stats = useMemo(() => {
     if (!samples.length) return { avg: NaN, min: NaN, max: NaN };
     const end = toMs(samples[samples.length - 1].ts);
@@ -124,14 +119,13 @@ function HeartRateSquare({
 
       <Text style={styles.squareSub} numberOfLines={1}>{sub}</Text>
 
-      {/* flowing curved area chart sits at bottom half */}
       <View style={styles.squareChart}>
         <Line
           areaChart
           curved
           data={data}
           thickness={2}
-          startFillColor="#f59e0b33"   // gradient
+          startFillColor="#f59e0b33"
           endFillColor="#f59e0b06"
           color="#f59e0b"
           startOpacity={1}
@@ -144,8 +138,8 @@ function HeartRateSquare({
           rulesType="dashed"
           rulesColor="#ffffff16"
           maxValue={yMax}
-          minValue={yMin}             // <- provide a safe lower bound
-          mostNegativeValue={yMin}    // <- also safe for versions expecting this prop
+          minValue={yMin}
+          mostNegativeValue={yMin}
         />
         <View style={styles.xLabelsRow}>
           <Text style={styles.xLabel}>{startLabel}</Text>
@@ -186,11 +180,25 @@ function OverviewScreen({ navigation }: any) {
             onPress={() => navigation.navigate('ReadinessDetail')}
           />
 
+          {/* Sleep hero (mock data) */}
+          <SleepWide
+          width={CARD_WIDE}
+          height={CARD}
+          onPress={() => navigation.navigate('SleepDetail')}
+          />
+
           {/* Heart tile */}
           <HeartRateSquare
             onPress={() => navigation.navigate('HRDetail')}
             samples={samples}
             badge={badge}
+          />
+
+
+          {/* HRV tile */}
+          <HRVSquare
+            onPress={() => navigation.navigate('HRVDetail')}
+            size={CARD}
           />
         </View>
       </ScrollView>
@@ -214,6 +222,8 @@ export default function App() {
         <Stack.Screen name="Overview" component={OverviewScreen} options={{ title: 'Activity' }} />
         <Stack.Screen name="HRDetail" component={HRDetail} options={{ title: 'Heart Rate' }} />
         <Stack.Screen name="ReadinessDetail" component={ReadinessDetail} options={{ title: 'Readiness' }} />
+        <Stack.Screen name="HRVDetail" component={HRVDetail} options={{ title: 'HRV' }} />
+        <Stack.Screen name="SleepDetail" component={SleepDetail} options={{ title: 'Sleep' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -223,7 +233,13 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0b0b0b' },
   container: { paddingHorizontal: PAD_H, paddingTop: 12, paddingBottom: 16 },
 
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 10 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    position: 'relative',
+    zIndex: 10,
+  },
   h1: { color: '#fff', fontSize: 22, fontWeight: '700' },
   refreshBtn: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: '#1a1a1a' },
   refreshText: { color: '#60a5fa', fontWeight: '700' },

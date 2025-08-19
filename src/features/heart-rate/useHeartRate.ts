@@ -4,8 +4,17 @@ import AppleHealthKit, { HealthKitPermissions } from 'react-native-health';
 import { baseline28, deltaPct, toDaily, type HRSample } from './math';
 import { decideBadge } from './insights';
 
-const HK = AppleHealthKit.Constants.Permissions;
-const READ = [HK.HeartRate, HK.RestingHeartRate, HK.SleepAnalysis].filter(Boolean);
+const HK = AppleHealthKit.Constants.Permissions as any;
+// Add HRV here so one authorization prompt covers both hooks.
+const HRV_CONST = HK?.HeartRateVariabilitySDNN ?? HK?.HeartRateVariability ?? null;
+
+const READ = [
+  HK?.HeartRate,
+  HK?.RestingHeartRate,
+  HK?.SleepAnalysis,
+  HRV_CONST,
+].filter(Boolean);
+
 const perms: HealthKitPermissions = { permissions: { read: READ as any, write: [] } };
 
 export function useHeartRate(daysBackDefault = 90) {
@@ -19,6 +28,12 @@ export function useHeartRate(daysBackDefault = 90) {
     if (didInit.current) return;
     didInit.current = true;
     if (Platform.OS !== 'ios') return;
+
+    if (READ.length === 0) {
+      console.warn('[useHeartRate] No HealthKit read types found; skipping init');
+      setAuthorized(false);
+      return;
+    }
 
     AppleHealthKit.initHealthKit(perms, (err) => {
       if (err) { setAuthorized(false); return; }
