@@ -10,10 +10,9 @@ import { LineChart } from 'react-native-gifted-charts';
 import { resampleLinear } from './src/ui/chartSafe';
 import { BadgeChip } from './src/ui/BadgeChip';
 
-// Heart rate & HRV
+// Heart rate & HRV detail
 import { useHeartRate } from './src/features/heart-rate/useHeartRate';
 import HRDetail from './src/screens/HRDetail';
-import HRVSquare from './src/features/hrv/HRVSquare';
 import HRVDetail from './src/screens/HRVDetail';
 
 // Readiness
@@ -28,6 +27,16 @@ import SleepDetail from './src/screens/SleepDetail';
 import ActivitySquare from './src/features/activity/ActivitySquare';
 import ActivityDetail from './src/screens/ActivityDetail';
 import { useActivity } from './src/features/activity/useActivity';
+
+// Mindfulness (minutes)
+import MeditationSquare from './src/features/mindfulness/MeditationSquare';
+import MeditationDetail from './src/screens/MeditationDetail';
+import { useMindfulness } from './src/features/mindfulness/useMindfulness';
+
+// SpO₂ (Blood Oxygen)
+import SpO2Square from './src/features/spo2/SpO2Square';
+import SpO2Detail from './src/screens/SpO2Detail';
+import { useSpO2 } from './src/features/spo2/useSpO2';
 
 const Line: any = LineChart;
 
@@ -162,10 +171,76 @@ function HeartRateSquare({
   );
 }
 
+// ---------- simple HRV demo tile (sample data) ----------
+function HRVSquareDemo({
+  onPress,
+  size,
+  value,
+  history,
+}: {
+  onPress: () => void;
+  size: number;
+  value: number;
+  history: { ts: string; ms: number }[];
+}) {
+  const data = history.map(h => ({ value: h.ms }));
+  const vals = history.map(h => h.ms);
+  const avg = vals.length ? Math.round(vals.reduce((s, x) => s + x, 0) / vals.length) : value;
+  const yMin = Math.max(0, Math.min(...vals, value) - 5);
+  const yMax = Math.max(...vals, value) + 5;
+
+  return (
+    <Pressable style={[styles.square, { width: size, height: size }]} onPress={onPress}>
+      <View style={styles.squareTop}>
+        <Text style={styles.squareTitle}>HRV</Text>
+      </View>
+
+      <View style={styles.squareCenter}>
+        <Text numberOfLines={1} style={styles.squareBig}>{value}</Text>
+        <Text style={styles.squareUnit}>ms</Text>
+      </View>
+
+      <Text style={styles.squareSub} numberOfLines={1}>7d avg {avg} ms</Text>
+
+      <View style={styles.squareChart}>
+        <Line
+          areaChart
+          curved
+          data={data}
+          thickness={2}
+          startFillColor="#60a5fa33"
+          endFillColor="#60a5fa06"
+          color="#60a5fa"
+          startOpacity={1}
+          endOpacity={0}
+          showDataPoints
+          yAxisLabelWidth={0}
+          xAxisThickness={0}
+          yAxisThickness={0}
+          noOfSections={3}
+          rulesType="dashed"
+          rulesColor="#ffffff16"
+          maxValue={yMax}
+          minValue={yMin}
+          mostNegativeValue={yMin}
+        />
+      </View>
+    </Pressable>
+  );
+}
+
 // ---------- Overview with Refresh ----------
 function OverviewScreen({ navigation }: any) {
   // Heart
   const { loading, samples, badge, refresh, lastSyncAt } = useHeartRate(365);
+
+  // Mindfulness
+  const {
+    loading: loadingMind,
+    minutesToday,
+    history: mindHistory,
+    lastSyncAt: mindLastSync,
+  } = useMindfulness();
 
   // Activity (HealthKit)
   const {
@@ -175,6 +250,45 @@ function OverviewScreen({ navigation }: any) {
     badge: activityBadge,
     lastSyncAt: lastActivitySyncAt,
   } = useActivity();
+
+  // SpO₂ (HealthKit)
+  const {
+    loading: loadingSpO2,
+    percent: spo2Percent,
+    history: spo2History,
+    lastSyncAt: spo2LastSyncAt,
+  } = useSpO2();
+
+  // ---- SpO₂ DEMO FALLBACK ----
+  const demoSpO2History = useMemo(() => {
+    const now = Date.now();
+    const start = now - 8 * 60 * 60 * 1000;
+    const vals = [96, 97, 98, 97, 96, 95, 96, 97, 98, 97, 96, 97, 98, 99, 98, 97];
+    return vals.map((v, i) => ({
+      ts: new Date(start + i * 30 * 60 * 1000).toISOString(),
+      percent: v,
+    }));
+  }, []);
+  const hasRealSpO2 =
+    Number.isFinite(spo2Percent as number) && !!(spo2History && spo2History.length > 0);
+  const showSpO2Value = hasRealSpO2
+    ? (spo2Percent as number)
+    : demoSpO2History[demoSpO2History.length - 1].percent;
+  const showSpO2History = hasRealSpO2 ? spo2History : demoSpO2History;
+  const showSpO2LastSync = hasRealSpO2 ? spo2LastSyncAt : Date.now();
+
+  // ---- HRV DEMO SERIES (7 days, one point/day) ----
+  const demoHRVHistory = useMemo(() => {
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    const start = now - 6 * day;
+    const vals = [48, 52, 60, 55, 58, 50, 56]; // ms (RMSSD-style)
+    return vals.map((v, i) => ({
+      ts: new Date(start + i * day).toISOString(),
+      ms: v,
+    }));
+  }, []);
+  const demoHRVValue = demoHRVHistory[demoHRVHistory.length - 1].ms;
 
   const status = loading
     ? 'Updating from Health…'
@@ -227,6 +341,15 @@ function OverviewScreen({ navigation }: any) {
             lastSyncAt={lastActivitySyncAt}
           />
 
+          {/* Mindfulness tile */}
+          <MeditationSquare
+            onPress={() => navigation.navigate('MeditationDetail', { history: mindHistory })}
+            size={CARD}
+            minutes={minutesToday}
+            loading={loadingMind}
+            lastSyncAt={mindLastSync}
+          />
+
           {/* Heart tile */}
           <HeartRateSquare
             onPress={() => navigation.navigate('HRDetail')}
@@ -234,10 +357,21 @@ function OverviewScreen({ navigation }: any) {
             badge={badge}
           />
 
-          {/* HRV tile */}
-          <HRVSquare
-            onPress={() => navigation.navigate('HRVDetail')}
+          {/* HRV tile (demo until HealthKit wired) */}
+          <HRVSquareDemo
+            onPress={() => navigation.navigate('HRVDetail', { history: demoHRVHistory })}
             size={CARD}
+            value={demoHRVValue}
+            history={demoHRVHistory}
+          />
+
+          {/* SpO₂ tile (real if available, otherwise demo) */}
+          <SpO2Square
+            onPress={() => navigation.navigate('SpO2Detail', { history: showSpO2History })}
+            size={CARD}
+            value={showSpO2Value}
+            loading={loadingSpO2 && !hasRealSpO2}
+            lastSyncAt={showSpO2LastSync}
           />
         </View>
       </ScrollView>
@@ -262,8 +396,10 @@ export default function App() {
         <Stack.Screen name="HRDetail" component={HRDetail} options={{ title: 'Heart Rate' }} />
         <Stack.Screen name="ReadinessDetail" component={ReadinessDetail} options={{ title: 'Readiness' }} />
         <Stack.Screen name="HRVDetail" component={HRVDetail} options={{ title: 'HRV' }} />
+        <Stack.Screen name="MeditationDetail" component={MeditationDetail} options={{ title: 'Mindfulness' }} />
         <Stack.Screen name="SleepDetail" component={SleepDetail} options={{ title: 'Sleep' }} />
         <Stack.Screen name="ActivityDetail" component={ActivityDetail} options={{ title: 'Activity' }} />
+        <Stack.Screen name="SpO2Detail" component={SpO2Detail} options={{ title: 'Blood Oxygen' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
