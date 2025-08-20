@@ -6,16 +6,28 @@ import {
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LineChart } from 'react-native-gifted-charts';
+
+import { resampleLinear } from './src/ui/chartSafe';
+import { BadgeChip } from './src/ui/BadgeChip';
+
+// Heart rate & HRV
 import { useHeartRate } from './src/features/heart-rate/useHeartRate';
 import HRDetail from './src/screens/HRDetail';
 import HRVSquare from './src/features/hrv/HRVSquare';
 import HRVDetail from './src/screens/HRVDetail';
-import { resampleLinear } from './src/ui/chartSafe';
+
+// Readiness
 import ReadinessWide from './src/features/readiness/ReadinessWide';
 import ReadinessDetail from './src/screens/ReadinessDetail';
-import { BadgeChip } from './src/ui/BadgeChip';
+
+// Sleep (mock/wide) + detail
 import SleepWide from './src/features/sleep/SleepWide';
-import SleepDetail from './src/screens/SleepDetail'
+import SleepDetail from './src/screens/SleepDetail';
+
+// Activity (real HealthKit data)
+import ActivitySquare from './src/features/activity/ActivitySquare';
+import ActivityDetail from './src/screens/ActivityDetail';
+import { useActivity } from './src/features/activity/useActivity';
 
 const Line: any = LineChart;
 
@@ -152,7 +164,18 @@ function HeartRateSquare({
 
 // ---------- Overview with Refresh ----------
 function OverviewScreen({ navigation }: any) {
+  // Heart
   const { loading, samples, badge, refresh, lastSyncAt } = useHeartRate(365);
+
+  // Activity (HealthKit)
+  const {
+    steps,
+    activeEnergyKcal,
+    loading: loadingActivity,
+    badge: activityBadge,
+    lastSyncAt: lastActivitySyncAt,
+  } = useActivity();
+
   const status = loading
     ? 'Updating from Health…'
     : lastSyncAt
@@ -180,11 +203,28 @@ function OverviewScreen({ navigation }: any) {
             onPress={() => navigation.navigate('ReadinessDetail')}
           />
 
-          {/* Sleep hero (mock data) */}
+          {/* Sleep hero (mock data for now) */}
           <SleepWide
-          width={CARD_WIDE}
-          height={CARD}
-          onPress={() => navigation.navigate('SleepDetail')}
+            width={CARD_WIDE}
+            height={CARD}
+            onPress={() => navigation.navigate('SleepDetail')}
+          />
+
+          {/* Activity tile (real HealthKit data) */}
+          <ActivitySquare
+            onPress={() =>
+              navigation.navigate('ActivityDetail', {
+                steps,
+                kcal: activeEnergyKcal,
+                lastSyncAt: lastActivitySyncAt,
+              })
+            }
+            size={CARD}
+            steps={steps}
+            kcal={activeEnergyKcal}
+            loading={loadingActivity}
+            badge={activityBadge}
+            lastSyncAt={lastActivitySyncAt}
           />
 
           {/* Heart tile */}
@@ -193,7 +233,6 @@ function OverviewScreen({ navigation }: any) {
             samples={samples}
             badge={badge}
           />
-
 
           {/* HRV tile */}
           <HRVSquare
@@ -224,6 +263,7 @@ export default function App() {
         <Stack.Screen name="ReadinessDetail" component={ReadinessDetail} options={{ title: 'Readiness' }} />
         <Stack.Screen name="HRVDetail" component={HRVDetail} options={{ title: 'HRV' }} />
         <Stack.Screen name="SleepDetail" component={SleepDetail} options={{ title: 'Sleep' }} />
+        <Stack.Screen name="ActivityDetail" component={ActivityDetail} options={{ title: 'Activity' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
