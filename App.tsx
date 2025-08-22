@@ -301,11 +301,22 @@ function OverviewScreen({ navigation }: any) {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.headerRow}>
           <Text style={styles.h1}>Activity</Text>
-          <Pressable style={styles.refreshBtn} onPress={() => refresh(365)} disabled={loading}>
-            <Text style={[styles.refreshText, loading && { opacity: 0.6 }]}>
-              {loading ? 'Refreshing…' : 'Refresh'}
-            </Text>
-          </Pressable>
+
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {/* DEV: quick nav to the ingestion debug screen */}
+            <Pressable
+              style={styles.refreshBtn}
+              onPress={() => navigation.navigate('IngestionDebug')}
+            >
+              <Text style={[styles.refreshText]}>Debug</Text>
+            </Pressable>
+
+            <Pressable style={styles.refreshBtn} onPress={() => refresh(365)} disabled={loading}>
+              <Text style={[styles.refreshText, loading && { opacity: 0.6 }]}>
+                {loading ? 'Refreshing…' : 'Refresh'}
+              </Text>
+            </Pressable>
+          </View>
         </View>
         <Text style={styles.statusText}>{status}</Text>
 
@@ -400,6 +411,13 @@ export default function App() {
         <Stack.Screen name="SleepDetail" component={SleepDetail} options={{ title: 'Sleep' }} />
         <Stack.Screen name="ActivityDetail" component={ActivityDetail} options={{ title: 'Activity' }} />
         <Stack.Screen name="SpO2Detail" component={SpO2Detail} options={{ title: 'Blood Oxygen' }} />
+
+        {/* DEV-ONLY route to the ingestion debug screen */}
+        <Stack.Screen
+          name="IngestionDebug"
+          component={require('./src/dev/IngestionDebug').default}
+          options={{ title: 'Ingestion Debug' }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

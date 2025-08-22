@@ -2,6 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
@@ -24,21 +25,25 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+
+	<!-- DEV-ONLY: allow HTTP to your relay -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
-		<false/>
+		<true/>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
-	<key>Privacy – Health Share Usage Description</key>
-	<string>This app reads your heart rate to show trends from your yoga practice.</string>
+
+	<!-- Health permissions -->
 	<key>NSHealthShareUsageDescription</key>
 	<string>This app reads your heart rate (and related metrics) to show activity trends.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>This app may write mindfulness minutes and other data you choose to log.</string>
+
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
