@@ -24,3 +24,21 @@ export function mapHeartRate(samples: HRSample[], ctx: Ctx): MetricRow[] {
       day: dayFromUTC(s.ts),
     }));
 }
+
+export function mapSpO2(samples: { ts: string; percent: number }[], ctx: Ctx): MetricRow[] {
+  return samples
+    .filter(s => Number.isFinite(s.percent))
+    .map(s => {
+      const pct = s.percent <= 1 ? s.percent * 100 : s.percent; // <-- safety
+      return {
+        user_id: ctx.user_id,
+        metric: 'spo2',
+        ts: toClickHouseTsUTC(s.ts),
+        value: pct,
+        unit: '%',
+        source: ctx.source,
+        device_id: ctx.device_id,
+        day: dayFromUTC(s.ts),
+      };
+    });
+}
