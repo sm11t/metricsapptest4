@@ -1,9 +1,10 @@
 import 'react-native-gesture-handler';
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef, useCallback, useState } from 'react';
+
 import {
-  Platform, SafeAreaView, View, Text, ScrollView, Pressable, StyleSheet, Dimensions,
+  Platform, SafeAreaView, View, Text, ScrollView, Pressable, StyleSheet, Dimensions, AppState,
 } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LineChart } from 'react-native-gifted-charts';
 
@@ -38,6 +39,12 @@ import SpO2Square from './src/features/spo2/SpO2Square';
 import SpO2Detail from './src/screens/SpO2Detail';
 import { useSpO2 } from './src/features/spo2/useSpO2';
 
+// (optional) foreground auto-ingestion runner
+import { startAutoIngestion } from './src/lib/ingestion/auto';
+
+import AppleHealthKit, { HealthKitPermissions } from 'react-native-health';
+import HRVSquare from './src/features/hrv/HRVSquare';
+
 const Line: any = LineChart;
 
 type HRPoint = { value: number; dataPointColor?: string; dataPointRadius?: number };
@@ -49,11 +56,12 @@ const CARD = Math.floor((SCREEN_W - PAD_H * 2 - GAP) / 2);
 const CHART_H = Math.round(CARD * 0.5);
 const CARD_WIDE = CARD * 2 + GAP;
 
-// ---------- math helpers for the 30-minute flow ----------
+// ---------- helpers ----------
 const toMs = (iso: string) => new Date(iso).getTime();
 const mean = (a: number[]) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN);
+const nowMs = () => Date.now();
+const minsSince = (t: number) => Math.floor((nowMs() - t) / 60_000);
 
-// Build smooth minute-level series for the *last 30 minutes ending at the latest sample time*.
 function last30MinSeries(samples: { ts: string; bpm: number }[]) {
   const end = samples.length ? new Date(samples[samples.length - 1].ts).getTime() : Date.now();
   const start = end - 30 * 60_000;
@@ -90,7 +98,6 @@ function last30MinSeries(samples: { ts: string; bpm: number }[]) {
   return { startLabel, endLabel, data, yMin: Math.max(0, lo), yMax: hi };
 }
 
-// ---------- compact HR tile ----------
 function HeartRateSquare({
   onPress,
   samples,
@@ -171,65 +178,7 @@ function HeartRateSquare({
   );
 }
 
-// ---------- simple HRV demo tile (sample data) ----------
-function HRVSquareDemo({
-  onPress,
-  size,
-  value,
-  history,
-}: {
-  onPress: () => void;
-  size: number;
-  value: number;
-  history: { ts: string; ms: number }[];
-}) {
-  const data = history.map(h => ({ value: h.ms }));
-  const vals = history.map(h => h.ms);
-  const avg = vals.length ? Math.round(vals.reduce((s, x) => s + x, 0) / vals.length) : value;
-  const yMin = Math.max(0, Math.min(...vals, value) - 5);
-  const yMax = Math.max(...vals, value) + 5;
-
-  return (
-    <Pressable style={[styles.square, { width: size, height: size }]} onPress={onPress}>
-      <View style={styles.squareTop}>
-        <Text style={styles.squareTitle}>HRV</Text>
-      </View>
-
-      <View style={styles.squareCenter}>
-        <Text numberOfLines={1} style={styles.squareBig}>{value}</Text>
-        <Text style={styles.squareUnit}>ms</Text>
-      </View>
-
-      <Text style={styles.squareSub} numberOfLines={1}>7d avg {avg} ms</Text>
-
-      <View style={styles.squareChart}>
-        <Line
-          areaChart
-          curved
-          data={data}
-          thickness={2}
-          startFillColor="#60a5fa33"
-          endFillColor="#60a5fa06"
-          color="#60a5fa"
-          startOpacity={1}
-          endOpacity={0}
-          showDataPoints
-          yAxisLabelWidth={0}
-          xAxisThickness={0}
-          yAxisThickness={0}
-          noOfSections={3}
-          rulesType="dashed"
-          rulesColor="#ffffff16"
-          maxValue={yMax}
-          minValue={yMin}
-          mostNegativeValue={yMin}
-        />
-      </View>
-    </Pressable>
-  );
-}
-
-// ---------- Overview with Refresh ----------
+// ---------- Overview with safe auto-refresh + “Updated X mins ago” ----------
 function OverviewScreen({ navigation }: any) {
   // Heart
   const { loading, samples, badge, refresh, lastSyncAt } = useHeartRate(365);
@@ -257,9 +206,59 @@ function OverviewScreen({ navigation }: any) {
     percent: spo2Percent,
     history: spo2History,
     lastSyncAt: spo2LastSyncAt,
+    refresh: refreshSpO2,
   } = useSpO2();
 
-  // ---- SpO₂ DEMO FALLBACK ----
+  // Track last “overview” refresh completion and force a render every minute
+  const [lastOverviewUpdatedAt, setLastOverviewUpdatedAt] = useState<number | null>(null);
+  const [minuteTick, setMinuteTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setMinuteTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Debounced/safe auto-refresh
+  const lastAutoRef = useRef(0);
+  const refreshingRef = useRef(false);
+  const safeRefresh = useCallback(async () => {
+    const now = Date.now();
+    if (refreshingRef.current) return;          // don't overlap
+    if (now - lastAutoRef.current < 7000) return; // debounce ~7s
+    lastAutoRef.current = now;
+    refreshingRef.current = true;
+    try {
+      await Promise.all([
+        refresh?.(2),     // HR: last 2 days (fast)
+        refreshSpO2?.(2), // SpO₂: last 2 days (fast)
+      ]);
+      setLastOverviewUpdatedAt(Date.now());     // mark “updated” when completes
+    } finally {
+      refreshingRef.current = false;
+    }
+  }, [refresh, refreshSpO2]);
+
+  // On mount + when screen gains focus
+  useEffect(() => {
+    const t = setTimeout(() => { void safeRefresh(); }, 500); // allow HK init
+    return () => clearTimeout(t);
+  }, [safeRefresh]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void safeRefresh();
+      return () => {};
+    }, [safeRefresh]),
+  );
+
+  // Whenever app returns to foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => {
+      if (s === 'active') setTimeout(() => { void safeRefresh(); }, 300);
+    });
+    return () => sub.remove();
+  }, [safeRefresh]);
+
+  // ---- SpO₂ fallback demo ----
   const demoSpO2History = useMemo(() => {
     const now = Date.now();
     const start = now - 8 * 60 * 60 * 1000;
@@ -277,12 +276,12 @@ function OverviewScreen({ navigation }: any) {
   const showSpO2History = hasRealSpO2 ? spo2History : demoSpO2History;
   const showSpO2LastSync = hasRealSpO2 ? spo2LastSyncAt : Date.now();
 
-  // ---- HRV DEMO SERIES (7 days, one point/day) ----
+  // HRV demo series
   const demoHRVHistory = useMemo(() => {
     const now = Date.now();
     const day = 24 * 60 * 60 * 1000;
     const start = now - 6 * day;
-    const vals = [48, 52, 60, 55, 58, 50, 56]; // ms (RMSSD-style)
+    const vals = [48, 52, 60, 55, 58, 50, 56];
     return vals.map((v, i) => ({
       ts: new Date(start + i * day).toISOString(),
       ms: v,
@@ -290,11 +289,19 @@ function OverviewScreen({ navigation }: any) {
   }, []);
   const demoHRVValue = demoHRVHistory[demoHRVHistory.length - 1].ms;
 
-  const status = loading
-    ? 'Updating from Health…'
-    : lastSyncAt
-    ? `Updated ${new Date(lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    : '—';
+  // Status: “Updating …” while loading; otherwise “Updated X mins ago”.
+  const status = useMemo(() => {
+    if (loading) return 'Updating from Health…';
+    if (lastOverviewUpdatedAt != null) {
+      const mins = minsSince(lastOverviewUpdatedAt);
+      return `Updated ${mins} min${mins === 1 ? '' : 's'} ago`;
+    }
+    if (lastSyncAt) {
+      const mins = minsSince(lastSyncAt);
+      return `Updated ${mins} min${mins === 1 ? '' : 's'} ago`;
+    }
+    return '—';
+  }, [loading, lastOverviewUpdatedAt, lastSyncAt, minuteTick]);
 
   return (
     <SafeAreaView style={styles.root}>
@@ -311,7 +318,7 @@ function OverviewScreen({ navigation }: any) {
               <Text style={[styles.refreshText]}>Debug</Text>
             </Pressable>
 
-            <Pressable style={styles.refreshBtn} onPress={() => refresh(365)} disabled={loading}>
+            <Pressable style={styles.refreshBtn} onPress={() => refresh?.(365)} disabled={loading}>
               <Text style={[styles.refreshText, loading && { opacity: 0.6 }]}>
                 {loading ? 'Refreshing…' : 'Refresh'}
               </Text>
@@ -321,21 +328,16 @@ function OverviewScreen({ navigation }: any) {
         <Text style={styles.statusText}>{status}</Text>
 
         <View style={styles.grid}>
-          {/* Wide Readiness hero */}
           <ReadinessWide
             width={CARD_WIDE}
             height={CARD}
             onPress={() => navigation.navigate('ReadinessDetail')}
           />
-
-          {/* Sleep hero (mock data for now) */}
           <SleepWide
             width={CARD_WIDE}
             height={CARD}
             onPress={() => navigation.navigate('SleepDetail')}
           />
-
-          {/* Activity tile (real HealthKit data) */}
           <ActivitySquare
             onPress={() =>
               navigation.navigate('ActivityDetail', {
@@ -351,8 +353,6 @@ function OverviewScreen({ navigation }: any) {
             badge={activityBadge}
             lastSyncAt={lastActivitySyncAt}
           />
-
-          {/* Mindfulness tile */}
           <MeditationSquare
             onPress={() => navigation.navigate('MeditationDetail', { history: mindHistory })}
             size={CARD}
@@ -360,23 +360,17 @@ function OverviewScreen({ navigation }: any) {
             loading={loadingMind}
             lastSyncAt={mindLastSync}
           />
-
-          {/* Heart tile */}
           <HeartRateSquare
             onPress={() => navigation.navigate('HRDetail')}
             samples={samples}
             badge={badge}
           />
-
-          {/* HRV tile (demo until HealthKit wired) */}
-          <HRVSquareDemo
+          <HRVSquare
             onPress={() => navigation.navigate('HRVDetail', { history: demoHRVHistory })}
             size={CARD}
             value={demoHRVValue}
             history={demoHRVHistory}
           />
-
-          {/* SpO₂ tile (real if available, otherwise demo) */}
           <SpO2Square
             onPress={() => navigation.navigate('SpO2Detail', { history: showSpO2History })}
             size={CARD}
@@ -393,6 +387,36 @@ function OverviewScreen({ navigation }: any) {
 const Stack = createNativeStackNavigator();
 
 export default function App() {
+  // HealthKit init once (quiet)
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const perms: HealthKitPermissions = {
+      permissions: {
+        read: [
+          AppleHealthKit.Constants.Permissions.HeartRate,
+          AppleHealthKit.Constants.Permissions.OxygenSaturation,
+        ],
+        write: [],
+      },
+    };
+    AppleHealthKit.initHealthKit(perms, (err: string) => {
+      if (err) console.log('HealthKit init error:', err);
+    });
+  }, []);
+
+  // Optional: foreground auto-ingestion (does not affect hook loading)
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const runner = startAutoIngestion?.({
+      user_id: 'u_dev',
+      source: 'apple_health',
+      device_id: 'ios_device',
+      intervalMs: 60_000,           // 1 min; adjust as needed
+      windowHours: 6,               // ingest only recent window
+    });
+    return () => runner?.stop?.();
+  }, []);
+
   if (Platform.OS !== 'ios') {
     return (
       <SafeAreaView style={styles.root}>
@@ -411,8 +435,6 @@ export default function App() {
         <Stack.Screen name="SleepDetail" component={SleepDetail} options={{ title: 'Sleep' }} />
         <Stack.Screen name="ActivityDetail" component={ActivityDetail} options={{ title: 'Activity' }} />
         <Stack.Screen name="SpO2Detail" component={SpO2Detail} options={{ title: 'Blood Oxygen' }} />
-
-        {/* DEV-ONLY route to the ingestion debug screen */}
         <Stack.Screen
           name="IngestionDebug"
           component={require('./src/dev/IngestionDebug').default}
