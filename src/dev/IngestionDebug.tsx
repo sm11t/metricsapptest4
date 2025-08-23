@@ -31,8 +31,8 @@ export default function IngestionDebug() {
     history: spo2History = [],
     lastSyncAt: spo2LastSync,
     loading: loadingSpO2,
-    refresh: refreshSpO2,              // <-- NEW: grab refresh from hook
-  } = useSpO2(2);                       // read ~48h by default for dev
+    refresh: refreshSpO2,
+  } = useSpO2(2); // ~48h window for dev
 
   const spo2Last10 = useMemo(() => {
     const sorted = [...spo2History].sort(
@@ -54,10 +54,7 @@ export default function IngestionDebug() {
 
   const requestHealthPermissions = () => {
     AppleHealthKit.initHealthKit(perms, (err: string) => {
-      if (err) {
-        setOut(`HealthKit init error: ${err}`);
-        return;
-      }
+      if (err) return setOut(`HealthKit init error: ${err}`);
       setOut('HealthKit ready: permissions OK');
     });
   };
@@ -69,23 +66,14 @@ export default function IngestionDebug() {
     const options = { startDate, endDate, unit: 'bpm' as const };
 
     AppleHealthKit.getHeartRateSamples(options, (err: string, results: HealthValue[]) => {
-      if (err) {
-        setOut(`getHeartRateSamples error: ${err}`);
-        return;
-      }
-      if (!results || results.length === 0) {
-        setOut('HealthKit HR: 0 samples in last 24h');
-        return;
-      }
+      if (err) return setOut(`getHeartRateSamples error: ${err}`);
+      if (!results?.length) return setOut('HealthKit HR: 0 samples in last 24h');
       const last = results[results.length - 1];
-      setOut(
-        `HealthKit HR: ${results.length} samples (24h)\n` +
-          `latest: ${last.endDate} → ${last.value} bpm`,
-      );
+      setOut(`HealthKit HR: ${results.length} samples (24h)\nlatest: ${last.endDate} → ${last.value} bpm`);
     });
   };
 
-  // ------- Hook refresh for HR -------
+  // ------- Hook refresh (HR & SpO₂) -------
   const loadHRViaHook = async () => {
     try {
       setOut('Loading HR via hook…');
@@ -100,7 +88,6 @@ export default function IngestionDebug() {
     }
   };
 
-  // ------- Hook refresh for SpO₂ (NEW) -------
   const loadSpO2ViaHook = async () => {
     try {
       setOut('Loading SpO₂ via hook…');
@@ -111,7 +98,20 @@ export default function IngestionDebug() {
     }
   };
 
-  // ------- Direct upload bypassing hook (HR) -------
+  // ------- Uploads (HR) -------
+  const uploadHRLast10 = async () => {
+    try {
+      if (!last10.length) {
+        return setOut('No HR samples available (hook). Try “Load HR (hook)” or “Upload last 10 HR (direct)”.');
+      }
+      const rows = mapHeartRate(last10, { user_id: 'u_dev', source: 'apple_health', device_id: 'ios_device' });
+      const res = await enqueue(rows);
+      setOut(`Uploaded ${res.sent} heart_rate rows (hook)`);
+    } catch (e: any) {
+      setOut(`uploadHRLast10 error: ${String(e)}`);
+    }
+  };
+
   const uploadHRLast10Direct = () => {
     const now = new Date();
     const startDate = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
@@ -120,24 +120,12 @@ export default function IngestionDebug() {
 
     AppleHealthKit.getHeartRateSamples(options, async (err: string, results: HealthValue[]) => {
       try {
-        if (err) {
-          setOut(`getHeartRateSamples error: ${err}`);
-          return;
-        }
-        if (!results || results.length === 0) {
-          setOut('No HR from HealthKit (direct).');
-          return;
-        }
-        const hrSamples = results.map(r => ({
-          ts: r.endDate,
-          bpm: Number(r.value),
-        }));
+        if (err) return setOut(`getHeartRateSamples error: ${err}`);
+        if (!results?.length) return setOut('No HR from HealthKit (direct).');
+
+        const hrSamples = results.map(r => ({ ts: r.endDate, bpm: Number(r.value) }));
         const last10Direct = hrSamples.slice(-10);
-        const rows = mapHeartRate(last10Direct, {
-          user_id: 'u_dev',
-          source: 'apple_health',
-          device_id: 'ios_device',
-        });
+        const rows = mapHeartRate(last10Direct, { user_id: 'u_dev', source: 'apple_health', device_id: 'ios_device' });
         const res = await enqueue(rows);
         setOut(`Uploaded ${res.sent} heart_rate rows (direct)`);
       } catch (e: any) {
@@ -146,18 +134,11 @@ export default function IngestionDebug() {
     });
   };
 
-  // ------- SpO₂ uploads -------
+  // ------- Uploads (SpO₂) -------
   const uploadSpO2Hook = async () => {
     try {
-      if (!spo2Last10.length) {
-        setOut('No SpO₂ samples (hook). Try “Load SpO₂ (hook refresh)”.');
-        return;
-      }
-      const rows = mapSpO2(spo2Last10, {
-        user_id: 'u_dev',
-        source: 'apple_health',
-        device_id: 'ios_device',
-      });
+      if (!spo2Last10.length) return setOut('No SpO₂ samples (hook). Try “Load SpO₂ (hook refresh)”.');
+      const rows = mapSpO2(spo2Last10, { user_id: 'u_dev', source: 'apple_health', device_id: 'ios_device' });
       const res = await enqueue(rows);
       setOut(`Uploaded ${res.sent} spo2 rows (hook)`);
     } catch (e: any) {
@@ -174,25 +155,16 @@ export default function IngestionDebug() {
       { startDate, endDate },
       async (err: string, results: HealthValue[] | any[]) => {
         try {
-          if (err) {
-            setOut(`getOxygenSaturationSamples error: ${err}`);
-            return;
-          }
-          if (!results || results.length === 0) {
-            setOut('No SpO₂ from HealthKit (direct).');
-            return;
-          }
+          if (err) return setOut(`getOxygenSaturationSamples error: ${err}`);
+          if (!results?.length) return setOut('No SpO₂ from HealthKit (direct).');
+
           const samples = results.map(r => {
             const v = Number((r as any).value);
-            const percent = v <= 1 ? v * 100 : v; // HK returns 0–1 range
+            const percent = v <= 1 ? v * 100 : v; // HK sometimes returns 0–1
             return { ts: (r as any).endDate, percent };
           });
           const last10 = samples.slice(-10);
-          const rows = mapSpO2(last10, {
-            user_id: 'u_dev',
-            source: 'apple_health',
-            device_id: 'ios_device',
-          });
+          const rows = mapSpO2(last10, { user_id: 'u_dev', source: 'apple_health', device_id: 'ios_device' });
           const res = await enqueue(rows);
           setOut(`Uploaded ${res.sent} spo2 rows (direct)`);
         } catch (e: any) {
@@ -216,54 +188,17 @@ export default function IngestionDebug() {
   const insertDummy = async () => {
     try {
       const rows = [
-        {
-          user_id: 'u_dev',
-          metric: 'heart_rate',
-          ts: '2025-08-22 12:40:00.000',
-          value: 74,
-          unit: 'bpm',
-          source: 'apple_health',
-          device_id: 'ios_device',
-          day: '2025-08-22',
-        },
-        {
-          user_id: 'u_dev',
-          metric: 'spo2',
-          ts: '2025-08-22 12:41:00.000',
-          value: 97,
-          unit: '%',
-          source: 'apple_health',
-          device_id: 'ios_device',
-          day: '2025-08-22',
-        },
+        { user_id: 'u_dev', metric: 'heart_rate', ts: '2025-08-22 12:40:00.000', value: 74, unit: 'bpm', source: 'apple_health', device_id: 'ios_device', day: '2025-08-22' },
+        { user_id: 'u_dev', metric: 'spo2',       ts: '2025-08-22 12:41:00.000', value: 97, unit: '%',   source: 'apple_health', device_id: 'ios_device', day: '2025-08-22' },
       ];
       const r = await fetch(`${RELAY_BASE_URL}/metrics/insertRows`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows }),
       });
       const j = await r.json().catch(() => ({}));
       setOut(r.ok ? JSON.stringify(j) : await r.text());
     } catch (e: any) {
       setOut(String(e));
-    }
-  };
-
-  const uploadHRLast10 = async () => {
-    try {
-      if (!last10.length)
-        return setOut(
-          'No HR samples available (hook). Try “Load HR (hook)” or “Upload last 10 HR (direct)”.',
-        );
-      const rows = mapHeartRate(last10, {
-        user_id: 'u_dev',
-        source: 'apple_health',
-        device_id: 'ios_device',
-      });
-      const res = await enqueue(rows);
-      setOut(`Uploaded ${res.sent} heart_rate rows (hook)`);
-    } catch (e: any) {
-      setOut(`uploadHRLast10 error: ${String(e)}`);
     }
   };
 
@@ -275,8 +210,7 @@ export default function IngestionDebug() {
                    GROUP BY metric
                    ORDER BY metric`;
       const r = await fetch(`${RELAY_BASE_URL}/dev/sql`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sql }),
       });
       setOut(await r.text());
