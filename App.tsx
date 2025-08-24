@@ -93,7 +93,7 @@ function last30MinSeries(samples: { ts: string; bpm: number }[]) {
   if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi - lo < 1) { lo = 59.5; hi = 60.5; }
 
   const startLabel = new Date(start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const endLabel   = new Date(end).toLocaleTimeString([],   { hour: '2-digit', minute: '2-digit' });
+  const endLabel = new Date(end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return { startLabel, endLabel, data, yMin: Math.max(0, lo), yMax: hi };
 }
@@ -246,7 +246,7 @@ function OverviewScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       void safeRefresh();
-      return () => {};
+      return () => { };
     }, [safeRefresh]),
   );
 
