@@ -1,18 +1,22 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Platform } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Platform, Alert } from 'react-native';
 import { RELAY_BASE_URL } from '../lib/config';
 
 import { useHeartRate } from '../features/heart-rate/useHeartRate';
 import { useSpO2 } from '../features/spo2/useSpO2';
 
-import { mapHeartRate, mapSpO2 } from '../lib/ingestion/map';
-import { enqueue } from '../lib/ingestion/queue';
+import { hrToRows, spo2ToRows } from '../lib/ingestion/rowBuilders';
+import { insertRows, health } from '../lib/ingestion/client';
 
 // HealthKit for permission + direct probe
 import AppleHealthKit, {
   HealthKitPermissions,
   HealthValue,
 } from 'react-native-health';
+
+const USER_ID = 'u_dev';
+const SOURCE = 'apple_health';
+const DEVICE_ID = 'ios_device';
 
 export default function IngestionDebug() {
   const [out, setOut] = useState<string>('ready');
@@ -98,15 +102,16 @@ export default function IngestionDebug() {
     }
   };
 
-  // ------- Uploads (HR) -------
+  // ------- Uploads (HR) via Relay -------
   const uploadHRLast10 = async () => {
     try {
       if (!last10.length) {
         return setOut('No HR samples available (hook). Try “Load HR (hook)” or “Upload last 10 HR (direct)”.');
       }
-      const rows = mapHeartRate(last10, { user_id: 'u_dev', source: 'apple_health', device_id: 'ios_device' });
-      const res = await enqueue(rows);
-      setOut(`Uploaded ${res.sent} heart_rate rows (hook)`);
+      const rows = hrToRows(last10, USER_ID, SOURCE, DEVICE_ID);
+      const res = await insertRows(rows);
+      if (res.ok) Alert.alert('HR upload', `Sent ${res.sent} rows`);
+      else Alert.alert('HR upload failed', res.error);
     } catch (e: any) {
       setOut(`uploadHRLast10 error: ${String(e)}`);
     }
@@ -125,22 +130,24 @@ export default function IngestionDebug() {
 
         const hrSamples = results.map(r => ({ ts: r.endDate, bpm: Number(r.value) }));
         const last10Direct = hrSamples.slice(-10);
-        const rows = mapHeartRate(last10Direct, { user_id: 'u_dev', source: 'apple_health', device_id: 'ios_device' });
-        const res = await enqueue(rows);
-        setOut(`Uploaded ${res.sent} heart_rate rows (direct)`);
+        const rows = hrToRows(last10Direct, USER_ID, SOURCE, DEVICE_ID);
+        const res = await insertRows(rows);
+        if (res.ok) Alert.alert('HR upload (direct)', `Sent ${res.sent} rows`);
+        else Alert.alert('HR upload (direct) failed', res.error);
       } catch (e: any) {
         setOut(`uploadHRLast10Direct error: ${String(e)}`);
       }
     });
   };
 
-  // ------- Uploads (SpO₂) -------
+  // ------- Uploads (SpO₂) via Relay -------
   const uploadSpO2Hook = async () => {
     try {
       if (!spo2Last10.length) return setOut('No SpO₂ samples (hook). Try “Load SpO₂ (hook refresh)”.');
-      const rows = mapSpO2(spo2Last10, { user_id: 'u_dev', source: 'apple_health', device_id: 'ios_device' });
-      const res = await enqueue(rows);
-      setOut(`Uploaded ${res.sent} spo2 rows (hook)`);
+      const rows = spo2ToRows(spo2Last10, USER_ID, SOURCE, DEVICE_ID);
+      const res = await insertRows(rows);
+      if (res.ok) Alert.alert('SpO₂ upload', `Sent ${res.sent} rows`);
+      else Alert.alert('SpO₂ upload failed', res.error);
     } catch (e: any) {
       setOut(`uploadSpO2Hook error: ${String(e)}`);
     }
@@ -164,9 +171,10 @@ export default function IngestionDebug() {
             return { ts: (r as any).endDate, percent };
           });
           const last10 = samples.slice(-10);
-          const rows = mapSpO2(last10, { user_id: 'u_dev', source: 'apple_health', device_id: 'ios_device' });
-          const res = await enqueue(rows);
-          setOut(`Uploaded ${res.sent} spo2 rows (direct)`);
+          const rows = spo2ToRows(last10, USER_ID, SOURCE, DEVICE_ID);
+          const res = await insertRows(rows);
+          if (res.ok) Alert.alert('SpO₂ upload (direct)', `Sent ${res.sent} rows`);
+          else Alert.alert('SpO₂ upload (direct) failed', res.error);
         } catch (e: any) {
           setOut(`uploadSpO2Direct error: ${String(e)}`);
         }
@@ -176,13 +184,8 @@ export default function IngestionDebug() {
 
   // ------- Relay helpers -------
   const ping = async () => {
-    try {
-      const r = await fetch(`${RELAY_BASE_URL}/health`);
-      const j = await r.json();
-      setOut(JSON.stringify(j, null, 2));
-    } catch (e: any) {
-      setOut(String(e));
-    }
+    const ok = await health();
+    setOut(ok ? 'Relay health OK' : 'Relay not reachable');
   };
 
   const insertDummy = async () => {
@@ -191,12 +194,8 @@ export default function IngestionDebug() {
         { user_id: 'u_dev', metric: 'heart_rate', ts: '2025-08-22 12:40:00.000', value: 74, unit: 'bpm', source: 'apple_health', device_id: 'ios_device', day: '2025-08-22' },
         { user_id: 'u_dev', metric: 'spo2',       ts: '2025-08-22 12:41:00.000', value: 97, unit: '%',   source: 'apple_health', device_id: 'ios_device', day: '2025-08-22' },
       ];
-      const r = await fetch(`${RELAY_BASE_URL}/metrics/insertRows`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows }),
-      });
-      const j = await r.json().catch(() => ({}));
-      setOut(r.ok ? JSON.stringify(j) : await r.text());
+      const res = await insertRows(rows);
+      setOut(res.ok ? `Dummy sent: ${res.sent}` : `Dummy failed: ${res.error}`);
     } catch (e: any) {
       setOut(String(e));
     }
@@ -204,16 +203,17 @@ export default function IngestionDebug() {
 
   const queryCounts = async () => {
     try {
-      const sql = `SELECT metric, count()
-                   FROM prefix_metrics_raw
-                   WHERE user_id = 'u_dev'
+      const sql = `SELECT metric, count() AS cnt
+                   FROM myt_metrics.myt_metrics_raw
+                   WHERE user_id = '${USER_ID}'
                    GROUP BY metric
                    ORDER BY metric`;
       const r = await fetch(`${RELAY_BASE_URL}/dev/sql`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sql }),
       });
-      setOut(await r.text());
+      const txt = await r.text();
+      setOut(txt);
     } catch (e: any) {
       setOut(String(e));
     }

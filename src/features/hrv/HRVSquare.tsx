@@ -1,42 +1,69 @@
+// src/features/hrv/HRVSquare.tsx
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
-import { makeChartSafe } from '../../ui/chartSafe';
-import { useHRV } from './useHRV';
-import { BadgeChip } from '../../ui/BadgeChip';
+
+type HRVPoint = { ts: string; ms: number };
+
+type Props = {
+  onPress: () => void;
+  size: number;
+  value?: number | null;         // current HRV (ms)
+  history?: HRVPoint[] | null;   // 7–30d history
+};
 
 const Line: any = LineChart;
 
-export default function HRVSquare({ onPress, size }: { onPress: () => void; size: number }) {
-  const { spark, today, todayDelta, badge, loading, refresh } = useHRV(365);
-  const points = useMemo(() => spark.map(v => ({ value: v })), [spark]);
-  const safe = useMemo(() => makeChartSafe(points, 60), [points]);
+export default function HRVSquare({
+  onPress,
+  size,
+  value = 0,
+  history = [],
+}: Props) {
+  const safeHistory = Array.isArray(history) ? history : [];
+  const vals = safeHistory.map(h => Number(h.ms)).filter(v => Number.isFinite(v));
+  const current = Number.isFinite(value as number) ? (value as number) : (vals.at(-1) ?? 0);
 
-  const val = Math.round(today?.hrv ?? NaN);
-  const deltaStr = todayDelta !== undefined ? `${todayDelta>0?'+':''}${todayDelta.toFixed(1)}%` : '—';
+  const data = useMemo(() => safeHistory.map(h => ({ value: h.ms })), [safeHistory]);
+
+  const avg7d = useMemo(() => {
+    if (!vals.length) return Math.round(current || 0);
+    const sum = vals.reduce((s, x) => s + x, 0);
+    return Math.round(sum / vals.length);
+  }, [vals, current]);
+
+  const { yMin, yMax, mostNegativeValue } = useMemo(() => {
+    if (!vals.length && !Number.isFinite(current)) {
+      return { yMin: 0, yMax: 1, mostNegativeValue: 0 };
+    }
+    const lo = Math.min(...(vals.length ? vals : [current, current])) - 5;
+    const hi = Math.max(...(vals.length ? vals : [current, current])) + 5;
+    const min = Math.max(0, Number.isFinite(lo) ? lo : 0);
+    const max = Number.isFinite(hi) ? hi : Math.max(1, current + 5);
+    return { yMin: min, yMax: max, mostNegativeValue: min };
+  }, [vals, current]);
 
   return (
-    <Pressable style={[styles.square, { width: size, height: size }]} onPress={onPress} disabled={loading}>
+    <Pressable style={[styles.square, { width: size, height: size }]} onPress={onPress}>
       <View style={styles.squareTop}>
         <Text style={styles.squareTitle}>HRV</Text>
-        {badge && <BadgeChip label={badge.badge} />}
       </View>
 
       <View style={styles.centerRow}>
-        <Text style={styles.big}>{Number.isFinite(val) ? val : '—'}</Text>
+        <Text style={styles.big}>{Number.isFinite(current) ? Math.round(current) : '—'}</Text>
         <Text style={styles.unit}>ms</Text>
       </View>
 
-      <Text style={styles.sub} numberOfLines={1}>{deltaStr} vs baseline</Text>
+      <Text style={styles.sub} numberOfLines={1}>7d avg {avg7d} ms</Text>
 
       <View style={styles.chart}>
         <Line
           areaChart
           curved
-          data={safe.data}
-          maxValue={safe.maxValue}
-          minValue={safe.mostNegativeValue}
-          mostNegativeValue={safe.mostNegativeValue}
+          data={data}
+          maxValue={yMax}
+          minValue={yMin}
+          mostNegativeValue={mostNegativeValue}
           thickness={2}
           startFillColor="#38bdf833"
           endFillColor="#38bdf806"

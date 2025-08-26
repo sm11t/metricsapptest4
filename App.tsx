@@ -15,6 +15,7 @@ import { BadgeChip } from './src/ui/BadgeChip';
 import { useHeartRate } from './src/features/heart-rate/useHeartRate';
 import HRDetail from './src/screens/HRDetail';
 import HRVDetail from './src/screens/HRVDetail';
+import { useHRV } from './src/features/hrv/useHRV'; // ← REAL HRV HOOK
 
 // Readiness
 import ReadinessWide from './src/features/readiness/ReadinessWide';
@@ -183,6 +184,15 @@ function OverviewScreen({ navigation }: any) {
   // Heart
   const { loading, samples, badge, refresh, lastSyncAt } = useHeartRate(365);
 
+  // HRV (REAL)
+  const {
+    ms: hrvMs,
+    history: hrvHistory,
+    loading: loadingHRV,
+    lastSyncAt: hrvLastSyncAt,
+    refresh: refreshHRV,
+  } = useHRV();
+
   // Mindfulness
   const {
     loading: loadingMind,
@@ -222,20 +232,21 @@ function OverviewScreen({ navigation }: any) {
   const refreshingRef = useRef(false);
   const safeRefresh = useCallback(async () => {
     const now = Date.now();
-    if (refreshingRef.current) return;          // don't overlap
+    if (refreshingRef.current) return;            // don't overlap
     if (now - lastAutoRef.current < 7000) return; // debounce ~7s
     lastAutoRef.current = now;
     refreshingRef.current = true;
     try {
       await Promise.all([
-        refresh?.(2),     // HR: last 2 days (fast)
-        refreshSpO2?.(2), // SpO₂: last 2 days (fast)
+        refresh?.(2),       // HR: last 2 days (fast)
+        refreshSpO2?.(2),   // SpO₂: last 2 days (fast)
+        refreshHRV?.(7),    // HRV: last 7 days (typical window)
       ]);
-      setLastOverviewUpdatedAt(Date.now());     // mark “updated” when completes
+      setLastOverviewUpdatedAt(Date.now());       // mark “updated” when completes
     } finally {
       refreshingRef.current = false;
     }
-  }, [refresh, refreshSpO2]);
+  }, [refresh, refreshSpO2, refreshHRV]);
 
   // On mount + when screen gains focus
   useEffect(() => {
@@ -258,7 +269,7 @@ function OverviewScreen({ navigation }: any) {
     return () => sub.remove();
   }, [safeRefresh]);
 
-  // ---- SpO₂ fallback demo ----
+  // ---- SpO₂ fallback demo (only if no real data yet) ----
   const demoSpO2History = useMemo(() => {
     const now = Date.now();
     const start = now - 8 * 60 * 60 * 1000;
@@ -276,22 +287,10 @@ function OverviewScreen({ navigation }: any) {
   const showSpO2History = hasRealSpO2 ? spo2History : demoSpO2History;
   const showSpO2LastSync = hasRealSpO2 ? spo2LastSyncAt : Date.now();
 
-  // HRV demo series
-  const demoHRVHistory = useMemo(() => {
-    const now = Date.now();
-    const day = 24 * 60 * 60 * 1000;
-    const start = now - 6 * day;
-    const vals = [48, 52, 60, 55, 58, 50, 56];
-    return vals.map((v, i) => ({
-      ts: new Date(start + i * day).toISOString(),
-      ms: v,
-    }));
-  }, []);
-  const demoHRVValue = demoHRVHistory[demoHRVHistory.length - 1].ms;
-
-  // Status: “Updating …” while loading; otherwise “Updated X mins ago”.
+  // Status: “Updating …” while any key stream is loading; otherwise “Updated X mins ago”.
+  const anyLoading = loading || loadingSpO2 || loadingHRV || loadingActivity || loadingMind;
   const status = useMemo(() => {
-    if (loading) return 'Updating from Health…';
+    if (anyLoading) return 'Updating from Health…';
     if (lastOverviewUpdatedAt != null) {
       const mins = minsSince(lastOverviewUpdatedAt);
       return `Updated ${mins} min${mins === 1 ? '' : 's'} ago`;
@@ -301,7 +300,7 @@ function OverviewScreen({ navigation }: any) {
       return `Updated ${mins} min${mins === 1 ? '' : 's'} ago`;
     }
     return '—';
-  }, [loading, lastOverviewUpdatedAt, lastSyncAt, minuteTick]);
+  }, [anyLoading, lastOverviewUpdatedAt, lastSyncAt, minuteTick]);
 
   return (
     <SafeAreaView style={styles.root}>
@@ -318,9 +317,9 @@ function OverviewScreen({ navigation }: any) {
               <Text style={[styles.refreshText]}>Debug</Text>
             </Pressable>
 
-            <Pressable style={styles.refreshBtn} onPress={() => refresh?.(365)} disabled={loading}>
-              <Text style={[styles.refreshText, loading && { opacity: 0.6 }]}>
-                {loading ? 'Refreshing…' : 'Refresh'}
+            <Pressable style={styles.refreshBtn} onPress={() => void safeRefresh()} disabled={anyLoading}>
+              <Text style={[styles.refreshText, anyLoading && { opacity: 0.6 }]}>
+                {anyLoading ? 'Refreshing…' : 'Refresh'}
               </Text>
             </Pressable>
           </View>
@@ -366,10 +365,10 @@ function OverviewScreen({ navigation }: any) {
             badge={badge}
           />
           <HRVSquare
-            onPress={() => navigation.navigate('HRVDetail', { history: demoHRVHistory })}
+            onPress={() => navigation.navigate('HRVDetail', { history: hrvHistory })}
             size={CARD}
-            value={demoHRVValue}
-            history={demoHRVHistory}
+            value={Number.isFinite(hrvMs as number) ? (hrvMs as number) : 0}
+            history={hrvHistory ?? []}
           />
           <SpO2Square
             onPress={() => navigation.navigate('SpO2Detail', { history: showSpO2History })}
@@ -390,12 +389,19 @@ export default function App() {
   // HealthKit init once (quiet)
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
+
+    // Tolerant HRV permission name across lib versions
+    const HRV_PERMISSION: any =
+      (AppleHealthKit as any).Constants?.Permissions?.HeartRateVariabilitySDNN ??
+      (AppleHealthKit as any).Constants?.Permissions?.HeartRateVariability;
+
     const perms: HealthKitPermissions = {
       permissions: {
         read: [
           AppleHealthKit.Constants.Permissions.HeartRate,
           AppleHealthKit.Constants.Permissions.OxygenSaturation,
-        ],
+          HRV_PERMISSION, // ← HRV (SDNN)
+        ].filter(Boolean) as any,
         write: [],
       },
     };
