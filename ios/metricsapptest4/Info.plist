@@ -2,7 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
@@ -26,25 +25,23 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 
-	<!-- DEV-ONLY: allow HTTP to your relay -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
 
+	<!-- Health permissions copy updated to explicitly include Blood Oxygen / HRV -->
+	<key>NSHealthShareUsageDescription</key>
+	<string>We read your health data — including Blood Oxygen, Heart Rate, HRV, steps, and sleep — to show your metrics and trends.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>We can write mindfulness minutes that you log in the app.</string>
+
+	<!-- Remove this if you don't use location. If you keep it, give it a non-empty string. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
-
-	<!-- Health permissions -->
-	<key>NSHealthShareUsageDescription</key>
-	<string>This app reads your heart rate (and related metrics) to show activity trends.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>This app may write mindfulness minutes and other data you choose to log.</string>
 
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
