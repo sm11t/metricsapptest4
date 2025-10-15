@@ -37,6 +37,9 @@ import CalendarStrip from './src/components/CalendarStrip';
 import HeartRateSquare from './src/components/HeartRateSquare';
 import styles, { CARD_WIDE } from './src/styles';
 
+// REDESIGN: New UI
+import { HomeScreen as RedesignHome } from './src/redesign/screens/HomeScreen';
+
 const minsSince = (t: number) => Math.floor((Date.now() - t) / 60_000);
 
 // ---------- Overview with safe auto-refresh + “Updated X mins ago” ----------
@@ -353,6 +356,14 @@ export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#0b0b0b' }, headerTintColor: '#fff' }}>
+        {/* REDESIGN: New Home Screen - Set as initial route */}
+        <Stack.Screen
+          name="RedesignHome"
+          component={RedesignHome}
+          options={{ headerShown: false }}
+        />
+
+        {/* Original screens */}
         <Stack.Screen name="Overview" component={OverviewScreen} options={{ title: 'Activity' }} />
         <Stack.Screen name="HRDetail" component={HRDetail} options={{ title: 'Heart Rate' }} />
         <Stack.Screen name="ReadinessDetail" component={ReadinessDetail} options={{ title: 'Readiness' }} />
