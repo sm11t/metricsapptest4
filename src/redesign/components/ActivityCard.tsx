@@ -5,25 +5,15 @@ import { CalendarGrid } from './CalendarGrid';
 import { CalendarLegend } from './CalendarLegend';
 import { CalendarStats } from './CalendarStats';
 import { ConnectWearableCard } from './ConnectWearableCard';
+import { ViewToggle } from './ViewToggle';
+import { WeeklyView } from './WeeklyView';
+import { WeeklyStats } from './WeeklyStats';
+
+type ViewMode = 'week' | 'month';
 
 export const ActivityCard: React.FC = () => {
-  const [currentDate, setCurrentDate] = useState(new Date());
-
-  const handlePrevMonth = () => {
-    setCurrentDate(prev => {
-      const newDate = new Date(prev);
-      newDate.setMonth(newDate.getMonth() - 1);
-      return newDate;
-    });
-  };
-
-  const handleNextMonth = () => {
-    setCurrentDate(prev => {
-      const newDate = new Date(prev);
-      newDate.setMonth(newDate.getMonth() + 1);
-      return newDate;
-    });
-  };
+  const [currentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
 
   const handleDayPress = (date: Date) => {
     console.log('Selected date:', date);
@@ -34,31 +24,51 @@ export const ActivityCard: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Month Navigation */}
-      <MonthNavigation
-        currentDate={currentDate}
-        onPrevMonth={handlePrevMonth}
-        onNextMonth={handleNextMonth}
-      />
-
-      {/* Calendar Grid */}
-      <View style={styles.calendarWrapper}>
-        <CalendarGrid
-          currentDate={currentDate}
-          onDayPress={handleDayPress}
+    <View style={[styles.container, viewMode === 'week' && styles.weeklyContainer]}>
+      {/* Month/Year and View Toggle */}
+      <View style={styles.header}>
+        <MonthNavigation currentDate={currentDate} />
+        <ViewToggle
+          selectedView={viewMode}
+          onViewChange={setViewMode}
         />
       </View>
 
+      {/* Calendar Grid (monthly) or Weekly View */}
+      {viewMode === 'month' ? (
+        <View style={styles.calendarWrapper}>
+          <CalendarGrid
+            currentDate={currentDate}
+            onDayPress={handleDayPress}
+          />
+        </View>
+      ) : (
+        <View style={styles.weeklyWrapper}>
+          <WeeklyView currentDate={currentDate} />
+        </View>
+      )}
+
       {/* Legend */}
-      <CalendarLegend />
+      <CalendarLegend showNoBookings={viewMode === 'week'} />
 
       {/* Stats */}
-      <CalendarStats
-        bookedHours={6}
-        completedHours={4}
-        upcomingHours={2}
-      />
+      {viewMode === 'month' ? (
+        <View style={styles.weeklyStatsWrapper}>
+          <CalendarStats
+            bookedHours={6}
+            completedHours={4}
+            upcomingHours={2}
+          />
+        </View>
+      ) : (
+        <View style={styles.weeklyStatsWrapper}>
+          <WeeklyStats
+            bookedHours={6}
+            completedHours={4}
+            upcomingHours={2}
+          />
+        </View>
+      )}
 
       {/* Connect Wearable */}
       <View style={styles.wearableWrapper}>
@@ -70,20 +80,37 @@ export const ActivityCard: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
+    width: 325,
+    height: 719,
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#F2F2F2',
     padding: 8,
-    // Shadow
+    // Shadow: 0 2px 4px 0 rgba(188, 188, 188, 0.12)
     shadowColor: 'rgba(188, 188, 188, 0.12)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 4,
     elevation: 2,
   },
+  weeklyContainer: {
+    height: 569,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   calendarWrapper: {
     marginTop: 12,
+  },
+  weeklyWrapper: {
+    marginTop: 12,
+  },
+  weeklyStatsWrapper: {
+    marginTop: 12,
+    alignItems: 'center',
   },
   wearableWrapper: {
     marginTop: 16,

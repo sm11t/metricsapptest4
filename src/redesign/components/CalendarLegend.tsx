@@ -1,9 +1,23 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
-export const CalendarLegend: React.FC = () => {
+interface CalendarLegendProps {
+  showNoBookings?: boolean;
+}
+
+export const CalendarLegend: React.FC<CalendarLegendProps> = ({
+  showNoBookings = false
+}) => {
   return (
     <View style={styles.container}>
+      {/* No bookings - only shown in weekly view */}
+      {showNoBookings && (
+        <View style={styles.item}>
+          <View style={[styles.dot, styles.noBookingsDot]} />
+          <Text style={styles.label}>No bookings</Text>
+        </View>
+      )}
+
       {/* Booked */}
       <View style={styles.item}>
         <View style={[styles.dot, styles.bookedDot]} />
@@ -41,6 +55,9 @@ const styles = StyleSheet.create({
   },
   completedDot: {
     backgroundColor: '#04A777',
+  },
+  noBookingsDot: {
+    backgroundColor: '#D3D3D3',
   },
   label: {
     color: '#8A8A8A',

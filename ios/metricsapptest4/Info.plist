@@ -24,7 +24,6 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -32,17 +31,12 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-
-	<!-- Health permissions copy updated to explicitly include Blood Oxygen / HRV -->
 	<key>NSHealthShareUsageDescription</key>
 	<string>We read your health data — including Blood Oxygen, Heart Rate, HRV, steps, and sleep — to show your metrics and trends.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>We can write mindfulness minutes that you log in the app.</string>
-
-	<!-- Remove this if you don't use location. If you keep it, give it a non-empty string. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
-
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

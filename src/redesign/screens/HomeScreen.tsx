@@ -39,7 +39,9 @@ export const HomeScreen: React.FC = () => {
         />
 
         {/* Activity Calendar */}
-        <ActivityCard />
+        <View style={styles.activityCardContainer}>
+          <ActivityCard />
+        </View>
 
         {/* Other components will go here */}
       </ScrollView>
@@ -50,7 +52,7 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.backgroundGray,
+    backgroundColor: '#F9F9F9',
   },
   content: {
     flex: 1,
@@ -58,5 +60,8 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: spacing.screenPadding,
     gap: spacing.base,
+  },
+  activityCardContainer: {
+    alignItems: 'center',
   },
 });

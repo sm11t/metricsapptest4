@@ -40,17 +40,15 @@ export const ConnectWearableCard: React.FC<ConnectWearableCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    display: 'flex',
     width: 285,
-    padding: 20,
-    paddingTop: 15,
+    paddingVertical: 20,
+    paddingHorizontal: 15,
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FFE0CB',
-    background: '#FFF9F5',
+    borderColor: '#FFE0C8',
     backgroundColor: '#FFF9F5',
   },
   watchContainer: {

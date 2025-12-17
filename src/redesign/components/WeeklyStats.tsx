@@ -2,11 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Svg, G, Rect, ClipPath, Defs } from 'react-native-svg';
 
-type CalendarStatsProps = {
+interface WeeklyStatsProps {
   bookedHours: number;
   completedHours: number;
   upcomingHours: number;
-};
+}
 
 const StatsIcon = () => (
   <Svg width="16" height="14" viewBox="0 0 16 14" fill="none">
@@ -23,7 +23,7 @@ const StatsIcon = () => (
   </Svg>
 );
 
-export const CalendarStats: React.FC<CalendarStatsProps> = ({
+export const WeeklyStats: React.FC<WeeklyStatsProps> = ({
   bookedHours,
   completedHours,
   upcomingHours,
@@ -32,7 +32,7 @@ export const CalendarStats: React.FC<CalendarStatsProps> = ({
     <View style={styles.container}>
       <StatsIcon />
       <Text style={styles.text}>
-        This month you've booked <Text style={styles.bold}>{bookedHours} Hrs</Text>, completed{' '}
+        This week you've booked <Text style={styles.bold}>{bookedHours} Hrs</Text>, completed{' '}
         <Text style={styles.bold}>{completedHours} Hrs</Text> and have another{' '}
         <Text style={styles.bold}>{upcomingHours} Hrs</Text> upcoming.
       </Text>
