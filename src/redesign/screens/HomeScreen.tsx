@@ -1,5 +1,5 @@
-import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Alert, View } from 'react-native';
+import React, { useState } from 'react';
+import { SafeAreaView, ScrollView, StyleSheet, Alert, View, Switch, Text } from 'react-native';
 import { Header } from '../components/Header';
 import { AlertBanner } from '../components/AlertBanner';
 import { EmptySessionCard } from '../components/EmptySessionCard';
@@ -8,6 +8,8 @@ import { ActivityCard } from '../components/ActivityCard';
 import { colors, spacing } from '../theme';
 
 export const HomeScreen: React.FC = () => {
+  const [isDeviceConnected, setIsDeviceConnected] = useState(false);
+
   const handleBookClass = () => {
     Alert.alert('Book a Class', 'Book a Class button pressed');
   };
@@ -31,6 +33,17 @@ export const HomeScreen: React.FC = () => {
         <AlertBanner onPress={handleVideoPress} />
         <EmptySessionCard />
 
+        {/* Temporary Device Connection Toggle */}
+        <View style={styles.toggleContainer}>
+          <Text style={styles.toggleLabel}>Device Connected (Debug)</Text>
+          <Switch
+            value={isDeviceConnected}
+            onValueChange={setIsDeviceConnected}
+            trackColor={{ false: '#D3D3D3', true: '#EE731B' }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
+
         {/* My Activity Section */}
         <SectionHeader
           title="My Activity"
@@ -40,7 +53,7 @@ export const HomeScreen: React.FC = () => {
 
         {/* Activity Calendar */}
         <View style={styles.activityCardContainer}>
-          <ActivityCard />
+          <ActivityCard isDeviceConnected={isDeviceConnected} />
         </View>
 
         {/* Other components will go here */}
@@ -60,6 +73,21 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: spacing.screenPadding,
     gap: spacing.base,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+  },
+  toggleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
   },
   activityCardContainer: {
     alignItems: 'center',

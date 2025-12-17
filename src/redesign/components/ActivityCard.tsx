@@ -8,10 +8,15 @@ import { ConnectWearableCard } from './ConnectWearableCard';
 import { ViewToggle } from './ViewToggle';
 import { WeeklyView } from './WeeklyView';
 import { WeeklyStats } from './WeeklyStats';
+import { HealthTrend } from './HealthTrend';
 
 type ViewMode = 'week' | 'month';
 
-export const ActivityCard: React.FC = () => {
+interface ActivityCardProps {
+  isDeviceConnected?: boolean;
+}
+
+export const ActivityCard: React.FC<ActivityCardProps> = ({ isDeviceConnected = false }) => {
   const [currentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
 
@@ -24,7 +29,7 @@ export const ActivityCard: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, viewMode === 'week' && styles.weeklyContainer]}>
+    <View style={styles.container}>
       {/* Month/Year and View Toggle */}
       <View style={styles.header}>
         <MonthNavigation currentDate={currentDate} />
@@ -70,9 +75,13 @@ export const ActivityCard: React.FC = () => {
         </View>
       )}
 
-      {/* Connect Wearable */}
-      <View style={styles.wearableWrapper}>
-        <ConnectWearableCard onDownloadPress={handleDownloadPress} />
+      {/* Connect Wearable or Health Trend */}
+      <View style={[styles.wearableWrapper, isDeviceConnected && styles.healthTrendWrapper]}>
+        {isDeviceConnected ? (
+          <HealthTrend />
+        ) : (
+          <ConnectWearableCard onDownloadPress={handleDownloadPress} />
+        )}
       </View>
     </View>
   );
@@ -81,7 +90,6 @@ export const ActivityCard: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     width: 325,
-    height: 719,
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
     borderWidth: 1,
@@ -93,9 +101,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 4,
     elevation: 2,
-  },
-  weeklyContainer: {
-    height: 569,
   },
   header: {
     flexDirection: 'row',
@@ -115,5 +120,12 @@ const styles = StyleSheet.create({
   wearableWrapper: {
     marginTop: 16,
     alignItems: 'center',
+  },
+  healthTrendWrapper: {
+    marginTop: 0,
+    marginLeft: -8,
+    marginRight: -8,
+    marginBottom: -8,
+    alignItems: 'stretch',
   },
 });
