@@ -46,7 +46,7 @@ export const PeriodToggle: React.FC<PeriodToggleProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    width: 325,
+    width: 370,
     height: 29,
     flexDirection: 'row',
     justifyContent: 'space-between',

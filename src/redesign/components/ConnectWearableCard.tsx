@@ -40,7 +40,8 @@ export const ConnectWearableCard: React.FC<ConnectWearableCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    width: 285,
+    width: 254,
+    height: 196,
     paddingVertical: 20,
     paddingHorizontal: 15,
     flexDirection: 'column',

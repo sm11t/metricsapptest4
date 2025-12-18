@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
     paddingTop: 14,
   },
   caloriesBox: {
-    width: 285,
+    width: 354,
     height: 74,
     borderWidth: 1,
     borderColor: '#E7E7E7',
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   smallBox: {
-    width: 138,
+    width: 172,
     height: 144,
     borderWidth: 1,
     borderColor: '#E7E7E7',

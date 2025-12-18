@@ -42,7 +42,7 @@ export const WeeklyStats: React.FC<WeeklyStatsProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    width: 324,
+    width: 354,
     height: 66,
     paddingTop: 15,
     paddingBottom: 15,

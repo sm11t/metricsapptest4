@@ -46,7 +46,7 @@ export const GoalProgress: React.FC<GoalProgressProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    width: 285,
+    width: 354,
     paddingVertical: 16,
     paddingHorizontal: 15,
     backgroundColor: '#FFFFFF',

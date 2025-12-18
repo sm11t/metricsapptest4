@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     marginBottom: 21,
   },
   cardContainer: {
-    width: 325,
+    width: 370,
     alignSelf: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
