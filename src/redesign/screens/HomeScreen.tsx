@@ -5,10 +5,12 @@ import { AlertBanner } from '../components/AlertBanner';
 import { EmptySessionCard } from '../components/EmptySessionCard';
 import { SectionHeader } from '../components/SectionHeader';
 import { ActivityCard } from '../components/ActivityCard';
+import { ActivityDetailsScreen } from './ActivityDetailsScreen';
 import { colors, spacing } from '../theme';
 
 export const HomeScreen: React.FC = () => {
   const [isDeviceConnected, setIsDeviceConnected] = useState(false);
+  const [showActivityDetails, setShowActivityDetails] = useState(false);
 
   const handleBookClass = () => {
     Alert.alert('Book a Class', 'Book a Class button pressed');
@@ -23,8 +25,21 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleViewDetails = () => {
-    Alert.alert('View Details', 'Navigate to activity details');
+    setShowActivityDetails(true);
   };
+
+  const handleBack = () => {
+    setShowActivityDetails(false);
+  };
+
+  if (showActivityDetails) {
+    return (
+      <ActivityDetailsScreen
+        isDeviceConnected={isDeviceConnected}
+        onBack={handleBack}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

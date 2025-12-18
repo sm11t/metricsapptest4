@@ -1,0 +1,105 @@
+{
+  "range": "weekly",
+  "week_start_date": "2025-08-12",
+
+  "calendar": [
+    { "day": "Mon", "date": "2025-08-08", "hours": 0, "status": "no booking" },
+    { "day": "Tue", "date": "2025-08-09", "hours": 1, "status": "booked" },
+    { "day": "Wed", "date": "2025-08-10", "hours": 2, "status": "completed" },
+    { "day": "Thu", "date": "2025-08-11", "hours": 0, "status": "no booking" },
+    { "day": "Fri", "date": "2025-08-12", "hours": 2, "status": "completed", "today": true },
+    { "day": "Sat", "date": "2025-08-13", "hours": 0, "status": "no booking" },
+    { "day": "Sun", "date": "2025-08-14", "hours": 1, "status": "booked" }
+  ],
+
+  "session_summary": {
+    "booked_hours": 6,
+    "completed_hours": 4,
+    "upcoming_hours": 2,
+    "interval": "week | month"
+  },
+
+  "current_goal": {
+    "goal_sessions": 4,
+    "completed_sessions": 5,
+    "status": "Exceeded",
+    "message": "Outstanding! You're crushing it this week - keep the streak alive 🏆",
+    "progress_label": "5/4"
+  },
+
+  "activity_overview": {
+    "finished": {
+      "one_on_one": 1,
+      "group": 1
+    },
+    "finished_vs_no_show": {
+      "finished": 2,
+      "no_show": 1
+    }
+  },
+
+  "wearable_status": {
+    "is_connected": false,
+    "show_health_trends": false,
+    "show_wearable_banner": true
+  },
+
+  "health_trend": {
+    "date": "12 August",
+
+    "calories": {
+      "label": "Calories Burnt",
+      "value": 1123,
+      "unit": "kcal",
+      "status": "GOOD",
+      "hourly_values": [34, 28, 36, 24, 18, 25, 27, 22, 30, 26]
+    },
+
+    "heart_rate_variability": {
+      "label": "Heart Rate Variability",
+      "value": 31,
+      "unit": "ms",
+      "status": "LOW",
+      "hourly_values": [
+        { "min": 18, "max": 26 },
+        { "min": 16, "max": 22 },
+        { "min": 14, "max": 20 }
+      ]
+    },
+
+    "resting_heart_rate": {
+      "label": "Resting Heart Rate",
+      "value": 72,
+      "unit": "bpm",
+      "status": "GOOD",
+      "hourly_values": [
+        { "min": 18, "max": 26 },
+        { "min": 16, "max": 22 },
+        { "min": 14, "max": 20 }
+      ]
+    },
+
+    "stress": {
+      "label": "stress",
+      "value": "26-50",
+      "status": "LOW STRESS",
+      "hourly_values": [10, 18, 14, 12, 20, 16, 22, 18, 16, 24]
+    },
+
+    "sleep": {
+      "label": "Sleep",
+      "value": 7,
+      "unit": "hrs",
+      "status": "GOOD",
+      "timeline": [
+        { "percent": 20, "label": "Light", "color": "blue" },
+        { "percent": 45, "label": "Deep", "color": "orange" },
+        { "percent": 35, "label": "REM", "color": "purple" }
+      ],
+      "sleep_window": {
+        "start": "11pm",
+        "end": "7am"
+      }
+    }
+  }
+}
