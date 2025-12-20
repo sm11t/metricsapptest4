@@ -89,7 +89,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({ isDeviceConnected = 
 
 const styles = StyleSheet.create({
   container: {
-    width: 370,
+    width: 325,
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
     borderWidth: 1,

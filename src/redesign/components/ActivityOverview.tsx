@@ -88,7 +88,7 @@ export const ActivityOverview: React.FC<ActivityOverviewProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    width: 354,
+    width: 307,
     paddingVertical: 16,
     paddingHorizontal: 15,
     backgroundColor: '#FFFFFF',

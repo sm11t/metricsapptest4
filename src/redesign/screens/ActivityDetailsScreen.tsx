@@ -9,6 +9,9 @@ import { GoalProgress } from '../components/GoalProgress';
 import { ActivityOverview } from '../components/ActivityOverview';
 import { ConnectWearableCard } from '../components/ConnectWearableCard';
 import { HealthTrend } from '../components/HealthTrend';
+import { WeeklyGoalSetter } from '../components/WeeklyGoalSetter';
+import { HealthMetricBox } from '../components/HealthMetricBox';
+import { scale } from '../utils/scaling';
 
 type Period = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
@@ -82,6 +85,11 @@ export const ActivityDetailsScreen: React.FC<ActivityDetailsScreenProps> = ({
             />
           </View>
 
+          {/* Weekly Goal Setter */}
+          <View style={styles.goalSetterWrapper}>
+            <WeeklyGoalSetter />
+          </View>
+
           {/* Goal Progress */}
           <View style={styles.goalWrapper}>
             <GoalProgress
@@ -102,14 +110,31 @@ export const ActivityDetailsScreen: React.FC<ActivityDetailsScreenProps> = ({
             />
           </View>
 
-          {/* Wearable Card or Health Trend */}
-          <View style={styles.wearableWrapper}>
-            {!isDeviceConnected ? (
+          {/* Wearable Card or Health Metrics */}
+          {!isDeviceConnected ? (
+            <View style={styles.wearableWrapper}>
               <ConnectWearableCard />
-            ) : (
-              <HealthTrend />
-            )}
-          </View>
+            </View>
+          ) : (
+            <>
+              {/* Health Metric Boxes */}
+              <View style={styles.healthMetricWrapper}>
+                <HealthMetricBox type="calories" />
+              </View>
+              <View style={styles.healthMetricWrapper}>
+                <HealthMetricBox type="hrv" />
+              </View>
+              <View style={styles.healthMetricWrapper}>
+                <HealthMetricBox type="rhr" />
+              </View>
+              <View style={styles.healthMetricWrapper}>
+                <HealthMetricBox type="stress" />
+              </View>
+              <View style={styles.healthMetricWrapper}>
+                <HealthMetricBox type="sleep" />
+              </View>
+            </>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -152,40 +177,44 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 25,
-    paddingTop: 24,
-    paddingBottom: 24,
+    paddingHorizontal: scale(25),
+    paddingTop: scale(24),
+    paddingBottom: scale(24),
   },
   toggleContainer: {
     alignItems: 'center',
-    marginBottom: 21,
+    marginBottom: scale(21),
   },
   cardContainer: {
-    width: 370,
+    width: scale(325),
     alignSelf: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    borderRadius: scale(8),
     borderWidth: 1,
     borderColor: '#F2F2F2',
-    padding: 8,
+    paddingVertical: scale(1),
+    paddingHorizontal: scale(8),
     shadowColor: 'rgba(188, 188, 188, 0.12)',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: scale(2) },
     shadowOpacity: 1,
-    shadowRadius: 4,
+    shadowRadius: scale(4),
     elevation: 2,
-    gap: 10,
+    gap: scale(10),
   },
   dateHeader: {
-    fontSize: 14,
+    fontSize: scale(14),
     fontWeight: '600',
     color: '#000000',
-    marginTop: 8,
+    marginTop: scale(8),
   },
   weeklyViewWrapper: {
-    marginLeft: -8,
-    marginRight: -8,
+    marginLeft: -scale(8),
+    marginRight: -scale(8),
   },
   statsWrapper: {
+    alignItems: 'center',
+  },
+  goalSetterWrapper: {
     alignItems: 'center',
   },
   goalWrapper: {
@@ -196,8 +225,11 @@ const styles = StyleSheet.create({
   },
   wearableWrapper: {
     alignItems: 'center',
-    marginBottom: -8,
-    marginLeft: -8,
-    marginRight: -8,
+    marginBottom: -scale(8),
+    marginLeft: -scale(8),
+    marginRight: -scale(8),
+  },
+  healthMetricWrapper: {
+    alignItems: 'center',
   },
 });

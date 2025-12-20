@@ -24,7 +24,7 @@ export const ConnectWearableCard: React.FC<ConnectWearableCardProps> = ({
         Sync our app with your smartwatch to track your sessions and health.
       </Text>
 
-      {/* Download Button */}
+      {/* Sync Button */}
       <Pressable
         style={({ pressed }) => [
           styles.button,
@@ -32,7 +32,7 @@ export const ConnectWearableCard: React.FC<ConnectWearableCardProps> = ({
         ]}
         onPress={onDownloadPress}
       >
-        <Text style={styles.buttonText}>Download MyYogaTeacher App</Text>
+        <Text style={styles.buttonText}>Sync your Device</Text>
       </Pressable>
     </View>
   );
@@ -40,13 +40,13 @@ export const ConnectWearableCard: React.FC<ConnectWearableCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    width: 254,
+    width: 285,
     height: 196,
     paddingVertical: 20,
     paddingHorizontal: 15,
     flexDirection: 'column',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 12,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#FFE0C8',
@@ -72,10 +72,10 @@ const styles = StyleSheet.create({
   },
   button: {
     alignSelf: 'stretch',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
     backgroundColor: '#EE731B',
-    borderRadius: 8,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -84,7 +84,9 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: '600',
+    lineHeight: 20,
+    fontFamily: 'SF Pro Text',
   },
 });

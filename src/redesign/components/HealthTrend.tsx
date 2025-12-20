@@ -528,9 +528,9 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 8,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
     paddingTop: 0,
-    paddingBottom: 20,
+    paddingBottom: 0,
     minHeight: 57,
   },
   header: {
@@ -539,6 +539,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
     marginBottom: 0,
+    paddingHorizontal: 20,
   },
   headerExpanded: {
     marginBottom: 20,
@@ -560,9 +561,11 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingTop: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   caloriesBox: {
-    width: 354,
+    width: 269,
     height: 74,
     borderWidth: 1,
     borderColor: '#E7E7E7',
@@ -638,9 +641,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
+    gap: 10,
   },
   smallBox: {
-    width: 172,
+    width: 137,
     height: 144,
     borderWidth: 1,
     borderColor: '#E7E7E7',
