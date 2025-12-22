@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Svg, Path, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { scale } from '../utils/scaling';
 
 interface ChevronIconProps {
   isExpanded: boolean;
@@ -386,17 +387,17 @@ export const HealthTrend: React.FC = () => {
       {isExpanded && (
         <View style={styles.content}>
           {/* Calories Burnt */}
-          <View style={styles.caloriesBox}>
-            <View style={styles.caloriesHeader}>
+          <View style={styles.metricBox}>
+            <View style={styles.metricHeader}>
               <CaloriesBurntIcon />
-              <Text style={styles.caloriesLabel}>Calories Burnt</Text>
+              <Text style={styles.metricLabel}>Calories Burnt</Text>
             </View>
 
             {/* Value and Status */}
-            <View style={styles.caloriesValueRow}>
-              <View style={styles.caloriesValueContainer}>
-                <Text style={styles.caloriesValue}>1123</Text>
-                <Text style={styles.caloriesUnit}>kcal</Text>
+            <View style={styles.metricValueRow}>
+              <View style={styles.metricValueContainer}>
+                <Text style={styles.metricValue}>1123</Text>
+                <Text style={styles.metricUnit}>kcal</Text>
               </View>
               <View style={styles.statusBadge}>
                 <Text style={styles.statusText}>GOOD</Text>
@@ -409,110 +410,88 @@ export const HealthTrend: React.FC = () => {
             </View>
           </View>
 
-          {/* HRV and RHR Row */}
-          <View style={styles.row}>
-            {/* HRV Box */}
-            <View style={styles.smallBox}>
-              <View style={styles.metricHeader}>
+          {/* First Row: HRV and RHR */}
+          <View style={styles.gridRow}>
+            {/* HRV */}
+            <View style={styles.smallMetricBox}>
+              <View style={styles.smallMetricHeader}>
                 <HRVIcon />
-                <Text style={styles.metricLabel}>HRV</Text>
+                <Text style={styles.smallMetricLabel}>HRV</Text>
               </View>
 
-              <View style={styles.metricValueRow}>
-                <Text style={styles.metricValue}>31</Text>
-                <Text style={styles.metricUnit}>ms</Text>
+              <View style={styles.smallMetricValueRow}>
+                <Text style={styles.smallMetricValue}>31</Text>
+                <Text style={styles.smallMetricUnit}>ms</Text>
               </View>
 
-              <View style={[styles.statusBadge, styles.statusBadgeLow]}>
+              <View style={[styles.statusBadge, styles.statusBadgeLow, styles.smallBoxBadge]}>
                 <Text style={[styles.statusText, styles.statusTextLow]}>LOW</Text>
               </View>
 
-              <View style={styles.graphFrame}>
-                <HRVBarChart
-                  data={[
-                    { min: 18, max: 26 },
-                    { min: 16, max: 22 },
-                    { min: 14, max: 20 }
-                  ]}
-                />
-              </View>
+              {/* Empty graph container - graph will be added later */}
+              <View style={styles.smallBoxGraph} />
             </View>
 
-            {/* RHR Box */}
-            <View style={styles.smallBox}>
-              <View style={styles.metricHeader}>
+            {/* RHR */}
+            <View style={styles.smallMetricBox}>
+              <View style={styles.smallMetricHeader}>
                 <RHRIcon />
-                <Text style={styles.metricLabel}>RHR</Text>
+                <Text style={styles.smallMetricLabel}>RHR</Text>
               </View>
 
-              <View style={styles.metricValueRow}>
-                <Text style={styles.metricValue}>72</Text>
-                <Text style={styles.metricUnit}>bpm</Text>
+              <View style={styles.smallMetricValueRow}>
+                <Text style={styles.smallMetricValue}>72</Text>
+                <Text style={styles.smallMetricUnit}>bpm</Text>
               </View>
 
-              <View style={styles.statusBadge}>
+              <View style={[styles.statusBadge, styles.smallBoxBadge]}>
                 <Text style={styles.statusText}>GOOD</Text>
               </View>
 
-              <View style={styles.graphFrame}>
-                <RHRBarChart
-                  data={[
-                    { min: 18, max: 26 },
-                    { min: 16, max: 22 },
-                    { min: 14, max: 20 }
-                  ]}
-                />
-              </View>
+              {/* Empty graph container - graph will be added later */}
+              <View style={styles.smallBoxGraph} />
             </View>
           </View>
 
-          {/* Stress and Sleep Row */}
-          <View style={styles.row}>
-            {/* Stress Box */}
-            <View style={styles.smallBox}>
-              <View style={styles.metricHeader}>
+          {/* Second Row: Stress and Sleep */}
+          <View style={styles.gridRow}>
+            {/* Stress */}
+            <View style={styles.smallMetricBox}>
+              <View style={styles.smallMetricHeader}>
                 <StressIcon />
-                <Text style={styles.metricLabel}>STRESS</Text>
+                <Text style={styles.smallMetricLabel}>STRESS</Text>
               </View>
 
-              <View style={styles.metricValueRow}>
-                <Text style={styles.metricValue}>26-50</Text>
+              <View style={styles.smallMetricValueRow}>
+                <Text style={styles.smallMetricValue}>26-50</Text>
               </View>
 
-              <View style={[styles.statusBadge, styles.statusBadgeStress]}>
-                <Text style={[styles.statusText, styles.statusTextStress]}>LOW STRESS</Text>
+              <View style={[styles.statusBadge, styles.smallBoxBadge]}>
+                <Text style={styles.statusText}>LOW STRESS</Text>
               </View>
 
-              <View style={styles.graphFrame}>
-                <StressBarChart data={[10, 18, 14, 12, 20, 16, 22, 18, 16, 24]} />
-              </View>
+              {/* Empty graph container - graph will be added later */}
+              <View style={styles.smallBoxGraph} />
             </View>
 
-            {/* Sleep Box */}
-            <View style={styles.smallBox}>
-              <View style={styles.metricHeader}>
+            {/* Sleep */}
+            <View style={styles.smallMetricBox}>
+              <View style={styles.smallMetricHeader}>
                 <SleepIcon />
-                <Text style={styles.metricLabel}>SLEEP</Text>
+                <Text style={styles.smallMetricLabel}>SLEEP</Text>
               </View>
 
-              <View style={styles.metricValueRow}>
-                <Text style={styles.metricValue}>7</Text>
-                <Text style={styles.metricUnit}>hrs</Text>
+              <View style={styles.smallMetricValueRow}>
+                <Text style={styles.smallMetricValue}>7</Text>
+                <Text style={styles.smallMetricUnit}>hrs</Text>
               </View>
 
-              <View style={styles.statusBadge}>
+              <View style={[styles.statusBadge, styles.smallBoxBadge]}>
                 <Text style={styles.statusText}>GOOD</Text>
               </View>
 
-              <View style={styles.graphFrame}>
-                <SleepTimeline
-                  timeline={[
-                    { percent: 20, label: 'Light', color: 'blue' },
-                    { percent: 45, label: 'Deep', color: 'orange' },
-                    { percent: 35, label: 'REM', color: 'purple' }
-                  ]}
-                />
-              </View>
+              {/* Empty graph container - graph will be added later */}
+              <View style={styles.smallBoxGraph} />
             </View>
           </View>
         </View>
@@ -524,146 +503,89 @@ export const HealthTrend: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
+    borderBottomLeftRadius: scale(8),
+    borderBottomRightRadius: scale(8),
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     paddingHorizontal: 0,
     paddingTop: 0,
     paddingBottom: 0,
-    minHeight: 57,
+    minHeight: scale(57),
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: scale(20),
     marginBottom: 0,
-    paddingHorizontal: 20,
+    paddingHorizontal: scale(20),
   },
   headerExpanded: {
-    marginBottom: 20,
+    marginBottom: scale(20),
   },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: scale(5),
   },
   title: {
-    fontSize: 14,
+    fontSize: scale(14),
     fontWeight: '600',
     color: '#000000',
   },
   date: {
-    fontSize: 10.5,
+    fontSize: scale(10.5),
     fontWeight: '400',
     color: '#8A9096',
   },
   content: {
-    paddingTop: 14,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: 0,
+    paddingHorizontal: scale(20),
+    paddingBottom: scale(20),
   },
-  caloriesBox: {
-    width: 269,
-    height: 74,
+  metricBox: {
+    width: scale(285),
+    height: scale(74),
     borderWidth: 1,
     borderColor: '#E7E7E7',
-    borderRadius: 8,
+    borderRadius: scale(8),
     backgroundColor: '#FFFFFF',
-    paddingTop: 15,
-    paddingBottom: 15,
-    paddingLeft: 15,
-    paddingRight: 15,
-    marginBottom: 10,
+    paddingTop: scale(15),
+    paddingBottom: scale(15),
+    paddingLeft: scale(15),
+    paddingRight: scale(15),
+    marginBottom: scale(10),
     overflow: 'hidden',
     position: 'relative',
   },
-  caloriesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  caloriesLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#264150',
-    fontFamily: 'SF Pro Text',
-    textTransform: 'uppercase',
-    letterSpacing: -0.2,
-  },
-  caloriesValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-    gap: 10,
-  },
-  caloriesValueContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  caloriesValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#000000',
-    fontFamily: 'Inter',
-  },
-  caloriesUnit: {
-    fontSize: 9,
-    fontWeight: '400',
-    color: '#888888',
-    fontFamily: 'SF Pro Text',
-    letterSpacing: -0.2,
-  },
-  statusBadge: {
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 7,
-    borderWidth: 1,
-    borderColor: '#C9F1E5',
-    backgroundColor: '#F3FFFB',
-  },
-  statusText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#04A777',
-    fontFamily: 'SF Pro Text',
-    textTransform: 'uppercase',
-    lineHeight: 13,
-  },
-  graphContainer: {
-    position: 'absolute',
-    right: 14,
-    bottom: 5,
-  },
-  row: {
+  gridRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
-    gap: 10,
+    marginBottom: scale(10),
+    gap: scale(10),
   },
-  smallBox: {
-    width: 137,
-    height: 144,
+  smallMetricBox: {
+    width: scale(138),
+    height: scale(144),
     borderWidth: 1,
     borderColor: '#E7E7E7',
-    borderRadius: 8,
+    borderRadius: scale(8),
     backgroundColor: '#FFFFFF',
-    paddingTop: 15,
-    paddingBottom: 15,
-    paddingLeft: 15,
-    paddingRight: 15,
+    paddingTop: scale(15),
+    paddingBottom: scale(15),
+    paddingLeft: scale(15),
+    paddingRight: scale(15),
     position: 'relative',
+    overflow: 'hidden',
   },
   metricHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: scale(6),
   },
   metricLabel: {
-    fontSize: 9,
-    fontWeight: '400',
+    fontSize: scale(12),
+    fontWeight: '500',
     color: '#264150',
     fontFamily: 'SF Pro Text',
     textTransform: 'uppercase',
@@ -671,52 +593,109 @@ const styles = StyleSheet.create({
   metricValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 2,
+    gap: scale(10),
+    marginTop: scale(9.67),
+  },
+  metricValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(10),
   },
   metricValue: {
-    fontSize: 14,
+    fontSize: scale(14),
     fontWeight: '700',
     color: '#000000',
     fontFamily: 'Inter',
   },
   metricUnit: {
-    fontSize: 9,
+    fontSize: scale(9),
     fontWeight: '400',
     color: '#888888',
     fontFamily: 'SF Pro Text',
     letterSpacing: -0.2,
   },
-  statusBadgeLow: {
-    borderColor: '#FFEAEA',
-    backgroundColor: '#FFEAEA',
-    marginTop: 2,
-    marginBottom: 7,
+  smallMetricHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(6),
+  },
+  smallMetricLabel: {
+    fontSize: scale(12),
+    fontWeight: '500',
+    color: '#264150',
+    fontFamily: 'SF Pro Text',
+    textTransform: 'uppercase',
+  },
+  smallMetricValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(10),
+    marginTop: scale(9),
+  },
+  smallMetricValue: {
+    fontSize: scale(14),
+    fontWeight: '700',
+    color: '#000000',
+    fontFamily: 'Inter',
+    lineHeight: scale(20),
+  },
+  smallMetricUnit: {
+    fontSize: scale(14),
+    fontWeight: '400',
+    color: '#888888',
+    fontFamily: 'Inter',
+    lineHeight: scale(20),
+  },
+  statusBadge: {
+    display: 'flex',
+    paddingVertical: scale(2),
+    paddingHorizontal: scale(6),
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: scale(7),
+    borderWidth: 1,
+    borderColor: '#C9F1E5',
+    backgroundColor: '#F3FFFB',
     alignSelf: 'flex-start',
+  },
+  statusText: {
+    fontSize: scale(9),
+    fontWeight: '600',
+    color: '#04A777',
+    fontFamily: 'SF Pro Text',
+    textTransform: 'uppercase',
+    lineHeight: scale(13),
+  },
+  graphContainer: {
+    position: 'absolute',
+    right: scale(14),
+    bottom: scale(5),
+  },
+  smallBoxBadge: {
+    position: 'absolute',
+    top: scale(64),
+    left: scale(15),
+  },
+  smallBoxGraph: {
+    position: 'absolute',
+    left: scale(15),
+    right: scale(15),
+    bottom: scale(17),
+    height: scale(26),
+    backgroundColor: '#F5F5F5',
+  },
+  statusBadgeLow: {
+    borderColor: '#FFD5D5',
+    backgroundColor: '#FFEAEA',
   },
   statusTextLow: {
     color: '#FF3131',
   },
   statusBadgeStress: {
-    borderColor: '#E0F7FA',
-    backgroundColor: '#E0F7FA',
-    marginTop: 2,
-    marginBottom: 7,
-    alignSelf: 'flex-start',
+    borderColor: '#C9F1E5',
+    backgroundColor: '#F3FFFB',
   },
   statusTextStress: {
-    color: '#00ACC1',
-  },
-  graphFrame: {
-    width: 95.85,
-    height: 70.7,
-    marginTop: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  hrvGraphContainer: {
-    position: 'absolute',
-    bottom: 15,
-    left: 15,
+    color: '#04A777',
   },
 });
