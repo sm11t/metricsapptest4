@@ -16,8 +16,8 @@ export const HomeScreen: React.FC = () => {
     Alert.alert('Menu', 'Menu button pressed');
   };
 
-  const handleSearchPress = () => {
-    Alert.alert('Search', 'Search button pressed');
+  const handleConversationPress = () => {
+    Alert.alert('Conversation', 'Conversation button pressed');
   };
 
   const handleNotificationPress = () => {
@@ -49,7 +49,7 @@ export const HomeScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <Header
         onMenuPress={handleMenuPress}
-        onSearchPress={handleSearchPress}
+        onConversationPress={handleConversationPress}
         onNotificationPress={handleNotificationPress}
       />
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>

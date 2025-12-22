@@ -2,16 +2,18 @@ import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { scale } from '../utils/scaling';
 import { HamburgerIcon } from '../assets/HamburgerIcon';
+import { ConversationIcon } from '../assets/ConversationIcon';
+import { NotificationBellIcon } from '../assets/NotificationBellIcon';
 
 type HeaderProps = {
   onMenuPress?: () => void;
-  onSearchPress?: () => void;
+  onConversationPress?: () => void;
   onNotificationPress?: () => void;
 };
 
 export const Header: React.FC<HeaderProps> = ({
   onMenuPress,
-  onSearchPress,
+  onConversationPress,
   onNotificationPress
 }) => {
   return (
@@ -30,17 +32,20 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Spacer */}
       <View style={styles.spacer} />
 
-      {/* Right - Search and Notification Icons */}
+      {/* Right - Conversation and Notification Icons */}
       <View style={styles.rightContainer}>
         <Pressable
           style={({ pressed }) => [
             styles.iconButton,
             pressed && styles.iconButtonPressed,
           ]}
-          onPress={onSearchPress}
+          onPress={onConversationPress}
         >
-          <View style={styles.iconPlaceholder} />
+          <ConversationIcon width={scale(21)} height={scale(22)} />
         </Pressable>
+
+        {/* Divider */}
+        <View style={styles.divider} />
 
         <Pressable
           style={({ pressed }) => [
@@ -49,7 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
           ]}
           onPress={onNotificationPress}
         >
-          <View style={styles.iconPlaceholder} />
+          <NotificationBellIcon width={scale(18)} height={scale(22)} />
         </Pressable>
       </View>
     </View>
@@ -64,7 +69,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     alignSelf: 'center',
-    paddingHorizontal: scale(16),
+    paddingLeft: scale(16),
+    paddingRight: scale(25.35),
     paddingTop: scale(12),
     paddingBottom: scale(12),
     backgroundColor: '#FFFFFF',
@@ -77,8 +83,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   iconButton: {
-    width: scale(24),
-    height: scale(24),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -91,12 +95,12 @@ const styles = StyleSheet.create({
   rightContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(16),
+    gap: scale(23.49),
   },
-  iconPlaceholder: {
-    width: scale(24),
-    height: scale(24),
-    backgroundColor: '#E0E0E0',
-    borderRadius: scale(4),
+  divider: {
+    width: 1,
+    height: scale(26),
+    backgroundColor: '#000000',
+    opacity: 0.1,
   },
 });
