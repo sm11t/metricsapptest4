@@ -1,88 +1,102 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { colors, spacing, layout } from '../theme';
-import { TopLogo } from '../assets/TopLogo';
+import { View, Pressable, StyleSheet } from 'react-native';
+import { scale } from '../utils/scaling';
 import { HamburgerIcon } from '../assets/HamburgerIcon';
 
 type HeaderProps = {
-  onBookClass?: () => void;
   onMenuPress?: () => void;
+  onSearchPress?: () => void;
+  onNotificationPress?: () => void;
 };
 
-export const Header: React.FC<HeaderProps> = ({ onBookClass, onMenuPress }) => {
+export const Header: React.FC<HeaderProps> = ({
+  onMenuPress,
+  onSearchPress,
+  onNotificationPress
+}) => {
   return (
     <View style={styles.container}>
-      {/* Logo */}
-      <View style={styles.logoContainer}>
-        <TopLogo width={36} height={22} />
-      </View>
-
-      {/* Book a Class Button */}
+      {/* Left - Hamburger Menu */}
       <Pressable
         style={({ pressed }) => [
-          styles.bookButton,
-          pressed && styles.bookButtonPressed,
-        ]}
-        onPress={onBookClass}
-      >
-        <Text style={styles.bookButtonText}>Book a Class</Text>
-      </Pressable>
-
-      {/* Menu Icon */}
-      <Pressable
-        style={({ pressed }) => [
-          styles.menuButton,
-          pressed && styles.menuButtonPressed,
+          styles.iconButton,
+          pressed && styles.iconButtonPressed,
         ]}
         onPress={onMenuPress}
       >
-        <HamburgerIcon width={26} height={16} />
+        <HamburgerIcon width={scale(24)} height={scale(16)} />
       </Pressable>
+
+      {/* Spacer */}
+      <View style={styles.spacer} />
+
+      {/* Right - Search and Notification Icons */}
+      <View style={styles.rightContainer}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.iconButton,
+            pressed && styles.iconButtonPressed,
+          ]}
+          onPress={onSearchPress}
+        >
+          <View style={styles.iconPlaceholder} />
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.iconButton,
+            pressed && styles.iconButtonPressed,
+          ]}
+          onPress={onNotificationPress}
+        >
+          <View style={styles.iconPlaceholder} />
+        </Pressable>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    height: layout.headerHeight,
+    width: scale(375),
+    height: scale(60),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.screenPadding,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  logoContainer: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bookButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    backgroundColor: '#FFF9F5', // Light peachy background from Figma
-    borderRadius: 14,
+    alignSelf: 'center',
+    paddingHorizontal: scale(16),
+    paddingTop: scale(12),
+    paddingBottom: scale(12),
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#FFE0CB',
+    borderColor: '#F2F2F2',
+    shadowColor: 'rgba(188, 188, 188, 0.12)',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 1,
+    shadowRadius: scale(4),
+    elevation: 2,
   },
-  bookButtonPressed: {
-    opacity: 0.7,
-  },
-  bookButtonText: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '600', // iOS supports 100-900, using 600 for semibold
-    lineHeight: 20,
-  },
-  menuButton: {
-    width: 40,
-    height: 40,
+  iconButton: {
+    width: scale(24),
+    height: scale(24),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuButtonPressed: {
+  iconButtonPressed: {
     opacity: 0.5,
+  },
+  spacer: {
+    flex: 1,
+  },
+  rightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(16),
+  },
+  iconPlaceholder: {
+    width: scale(24),
+    height: scale(24),
+    backgroundColor: '#E0E0E0',
+    borderRadius: scale(4),
   },
 });

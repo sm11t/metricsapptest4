@@ -12,12 +12,16 @@ export const HomeScreen: React.FC = () => {
   const [isDeviceConnected, setIsDeviceConnected] = useState(false);
   const [showActivityDetails, setShowActivityDetails] = useState(false);
 
-  const handleBookClass = () => {
-    Alert.alert('Book a Class', 'Book a Class button pressed');
-  };
-
   const handleMenuPress = () => {
     Alert.alert('Menu', 'Menu button pressed');
+  };
+
+  const handleSearchPress = () => {
+    Alert.alert('Search', 'Search button pressed');
+  };
+
+  const handleNotificationPress = () => {
+    Alert.alert('Notifications', 'Notification button pressed');
   };
 
   const handleVideoPress = () => {
@@ -43,7 +47,11 @@ export const HomeScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header onBookClass={handleBookClass} onMenuPress={handleMenuPress} />
+      <Header
+        onMenuPress={handleMenuPress}
+        onSearchPress={handleSearchPress}
+        onNotificationPress={handleNotificationPress}
+      />
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         <AlertBanner onPress={handleVideoPress} />
         <EmptySessionCard />
