@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { WatchIcon } from '../assets/WatchIcon';
+import { scale } from '../utils/scaling';
 
 type ConnectWearableCardProps = {
   onDownloadPress?: () => void;
@@ -13,7 +14,7 @@ export const ConnectWearableCard: React.FC<ConnectWearableCardProps> = ({
     <View style={styles.container}>
       {/* Watch Icon */}
       <View style={styles.watchContainer}>
-        <WatchIcon width={36} height={60} />
+        <WatchIcon width={scale(36)} height={scale(60)} />
       </View>
 
       {/* Title */}
@@ -40,53 +41,58 @@ export const ConnectWearableCard: React.FC<ConnectWearableCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    width: 285,
-    height: 196,
-    paddingVertical: 20,
-    paddingHorizontal: 15,
+    width: scale(295),
+    paddingVertical: scale(20),
+    paddingHorizontal: scale(20),
     flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 12,
-    borderRadius: 8,
+    alignItems: 'center',
+    gap: scale(10),
+    borderRadius: scale(8),
     borderWidth: 1,
     borderColor: '#FFE0C8',
     backgroundColor: '#FFF9F5',
   },
   watchContainer: {
     alignSelf: 'center',
-    marginBottom: 5,
   },
   title: {
     color: '#000000',
-    fontSize: 14,
+    fontSize: scale(14),
     fontWeight: '600',
+    fontFamily: 'SF Pro Text',
     textAlign: 'center',
     alignSelf: 'stretch',
   },
   description: {
     color: '#757575',
-    fontSize: 12,
+    fontSize: scale(12),
     fontWeight: '500',
+    fontFamily: 'SF Pro Text',
     textAlign: 'center',
     alignSelf: 'stretch',
   },
   button: {
-    alignSelf: 'stretch',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
+    alignSelf: 'center',
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(15),
     backgroundColor: '#EE731B',
-    borderRadius: 14,
+    borderRadius: scale(14),
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: 'rgba(248, 102, 36, 0.15)',
+    shadowOffset: { width: 0, height: scale(2) },
+    shadowOpacity: 1,
+    shadowRadius: scale(4),
+    elevation: 2,
   },
   buttonPressed: {
     opacity: 0.8,
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 14.5,
+    fontSize: scale(14.5),
     fontWeight: '600',
-    lineHeight: 20,
+    lineHeight: scale(20),
     fontFamily: 'SF Pro Text',
   },
 });

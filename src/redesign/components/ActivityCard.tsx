@@ -9,6 +9,7 @@ import { ViewToggle } from './ViewToggle';
 import { WeeklyView } from './WeeklyView';
 import { WeeklyStats } from './WeeklyStats';
 import { HealthTrend } from './HealthTrend';
+import { scale } from '../utils/scaling';
 
 type ViewMode = 'week' | 'month';
 
@@ -17,7 +18,7 @@ interface ActivityCardProps {
 }
 
 export const ActivityCard: React.FC<ActivityCardProps> = ({ isDeviceConnected = false }) => {
-  const [currentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
 
   const handleDayPress = (date: Date) => {
@@ -28,11 +29,36 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({ isDeviceConnected = 
     console.log('Download MyYogaTeacher App pressed');
   };
 
+  const handlePreviousMonth = () => {
+    const newDate = new Date(currentDate);
+    if (viewMode === 'month') {
+      newDate.setMonth(currentDate.getMonth() - 1);
+    } else {
+      newDate.setDate(currentDate.getDate() - 7);
+    }
+    setCurrentDate(newDate);
+  };
+
+  const handleNextMonth = () => {
+    const newDate = new Date(currentDate);
+    if (viewMode === 'month') {
+      newDate.setMonth(currentDate.getMonth() + 1);
+    } else {
+      newDate.setDate(currentDate.getDate() + 7);
+    }
+    setCurrentDate(newDate);
+  };
+
   return (
     <View style={styles.container}>
       {/* Month/Year and View Toggle */}
       <View style={styles.header}>
-        <MonthNavigation currentDate={currentDate} />
+        <MonthNavigation
+          currentDate={currentDate}
+          onPreviousPress={handlePreviousMonth}
+          onNextPress={handleNextMonth}
+          viewMode={viewMode}
+        />
         <ViewToggle
           selectedView={viewMode}
           onViewChange={setViewMode}
@@ -89,17 +115,17 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({ isDeviceConnected = 
 
 const styles = StyleSheet.create({
   container: {
-    width: 325,
+    width: scale(325),
+    alignSelf: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    borderRadius: scale(8),
     borderWidth: 1,
     borderColor: '#F2F2F2',
-    padding: 8,
-    // Shadow: 0 2px 4px 0 rgba(188, 188, 188, 0.12)
+    padding: scale(8),
     shadowColor: 'rgba(188, 188, 188, 0.12)',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: scale(2) },
     shadowOpacity: 1,
-    shadowRadius: 4,
+    shadowRadius: scale(4),
     elevation: 2,
   },
   header: {
@@ -108,24 +134,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   calendarWrapper: {
-    marginTop: 12,
+    marginTop: scale(12),
   },
   weeklyWrapper: {
-    marginTop: 12,
+    marginTop: scale(12),
   },
   weeklyStatsWrapper: {
-    marginTop: 12,
+    marginTop: scale(12),
+    marginLeft: scale(-8),
+    marginRight: scale(-8),
     alignItems: 'center',
   },
   wearableWrapper: {
-    marginTop: 16,
+    marginTop: scale(16),
     alignItems: 'center',
   },
   healthTrendWrapper: {
     marginTop: 0,
-    marginLeft: -8,
-    marginRight: -8,
-    marginBottom: -8,
+    marginLeft: scale(-8),
+    marginRight: scale(-8),
+    marginBottom: scale(-8),
     alignItems: 'stretch',
   },
 });

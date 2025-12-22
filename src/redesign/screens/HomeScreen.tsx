@@ -7,6 +7,7 @@ import { SectionHeader } from '../components/SectionHeader';
 import { ActivityCard } from '../components/ActivityCard';
 import { ActivityDetailsScreen } from './ActivityDetailsScreen';
 import { colors, spacing } from '../theme';
+import { scale } from '../utils/scaling';
 
 export const HomeScreen: React.FC = () => {
   const [isDeviceConnected, setIsDeviceConnected] = useState(false);
@@ -74,10 +75,8 @@ export const HomeScreen: React.FC = () => {
           onLinkPress={handleViewDetails}
         />
 
-        {/* Activity Calendar */}
-        <View style={styles.activityCardContainer}>
-          <ActivityCard isDeviceConnected={isDeviceConnected} />
-        </View>
+        {/* Activity Card */}
+        <ActivityCard isDeviceConnected={isDeviceConnected} />
 
         {/* Other components will go here */}
       </ScrollView>
@@ -111,8 +110,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#000000',
-  },
-  activityCardContainer: {
-    alignItems: 'center',
   },
 });
