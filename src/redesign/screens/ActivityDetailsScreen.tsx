@@ -10,6 +10,11 @@ import { ActivityOverview } from '../components/ActivityOverview';
 import { ConnectWearableCard } from '../components/ConnectWearableCard';
 import { HealthTrend } from '../components/HealthTrend';
 import { WeeklyGoalSetter } from '../components/WeeklyGoalSetter';
+import { WeeklyGoalStatus } from '../components/WeeklyGoalStatus';
+import { SessionDetailsCard } from '../components/SessionDetailsCard';
+import { SmallHealthMetricBox } from '../components/SmallHealthMetricBox';
+import { WeekNavigation } from '../components/WeekNavigation';
+import { SessionEngagementCard } from '../components/SessionEngagementCard';
 import { HealthMetricBox } from '../components/HealthMetricBox';
 import { scale } from '../utils/scaling';
 
@@ -36,7 +41,12 @@ export const ActivityDetailsScreen: React.FC<ActivityDetailsScreenProps> = ({
   isDeviceConnected = false,
   onBack,
 }) => {
-  const [selectedPeriod, setSelectedPeriod] = useState<Period>('weekly');
+  const [selectedPeriod, setSelectedPeriod] = useState<Period>('daily');
+
+  const getCurrentDate = () => {
+    const date = new Date();
+    return date.toLocaleDateString('en-US', { day: 'numeric', month: 'long' });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -65,74 +75,178 @@ export const ActivityDetailsScreen: React.FC<ActivityDetailsScreenProps> = ({
 
         {/* Card Container */}
         <View style={styles.cardContainer}>
-          {/* Date Header */}
-          <Text style={styles.dateHeader}>9 September</Text>
-
-          {/* Weekly View */}
-          <View style={styles.weeklyViewWrapper}>
-            <WeeklyView currentDate={new Date()} />
-          </View>
-
-          {/* Calendar Legend */}
-          <CalendarLegend showNoBookings={true} />
-
-          {/* Calendar Stats */}
-          <View style={styles.statsWrapper}>
-            <CalendarStats
-              bookedHours={6}
-              completedHours={4}
-              upcomingHours={2}
-            />
-          </View>
-
-          {/* Weekly Goal Setter */}
-          <View style={styles.goalSetterWrapper}>
-            <WeeklyGoalSetter />
-          </View>
-
-          {/* Goal Progress */}
-          <View style={styles.goalWrapper}>
-            <GoalProgress
-              goalSessions={4}
-              completedSessions={5}
-              status="Exceeded"
-              message="Outstanding! You're crushing it this week - keep the streak alive 🏆"
-            />
-          </View>
-
-          {/* Activity Overview */}
-          <View style={styles.overviewWrapper}>
-            <ActivityOverview
-              oneOnOne={1}
-              group={1}
-              finished={2}
-              noShow={1}
-            />
-          </View>
-
-          {/* Wearable Card or Health Metrics */}
-          {!isDeviceConnected ? (
-            <View style={styles.wearableWrapper}>
-              <ConnectWearableCard />
-            </View>
-          ) : (
+          {selectedPeriod === 'daily' && (
             <>
-              {/* Health Metric Boxes */}
-              <View style={styles.healthMetricWrapper}>
-                <HealthMetricBox type="calories" />
+              {/* Date Header */}
+              <Text style={styles.dateHeader}>{getCurrentDate()}</Text>
+
+              {/* Weekly View */}
+              <View style={styles.weeklyViewWrapper}>
+                <WeeklyView currentDate={new Date()} />
               </View>
-              <View style={styles.healthMetricWrapper}>
-                <HealthMetricBox type="hrv" />
+
+              {/* Calendar Legend */}
+              <CalendarLegend showNoBookings={true} />
+
+              {/* Calendar Stats - 22px below legend */}
+              <View style={styles.dailyStatsWrapper}>
+                <CalendarStats
+                  bookedHours={6}
+                  completedHours={4}
+                  upcomingHours={2}
+                />
               </View>
-              <View style={styles.healthMetricWrapper}>
-                <HealthMetricBox type="rhr" />
+
+              {/* This Week's Goal Title */}
+              <Text style={styles.goalTitle}>This Week's Goal</Text>
+
+              {/* Weekly Goal Status */}
+              <View style={styles.weeklyGoalStatusWrapper}>
+                <WeeklyGoalStatus
+                  completedSessions={4}
+                  goalSessions={4}
+                  status="Met"
+                  message="Goal achieved! Keep the momentum going - book your next session to stay consistent 🔥"
+                />
               </View>
-              <View style={styles.healthMetricWrapper}>
-                <HealthMetricBox type="stress" />
+
+              {/* Activity Overview Title */}
+              <Text style={styles.activityOverviewTitle}>Activity Overview</Text>
+
+              {/* Session Details Card */}
+              <View style={styles.sessionDetailsWrapper}>
+                <SessionDetailsCard />
               </View>
-              <View style={styles.healthMetricWrapper}>
-                <HealthMetricBox type="sleep" />
+
+              {/* Health Trends or Connect Wearable */}
+              {isDeviceConnected ? (
+                <>
+                  {/* Health Trends Title */}
+                  <Text style={styles.healthTrendsTitle}>Health Trends</Text>
+
+                  {/* Last Sync Text */}
+                  <Text style={styles.lastSyncText}>Last sync at 5:00 PM, 12 Dec 25</Text>
+
+                  {/* Small Health Metric Boxes Row */}
+                  <View style={styles.smallMetricsRow}>
+                    <SmallHealthMetricBox type="steps" value="7200" />
+                    <SmallHealthMetricBox type="heartRate" value="73" unit="bpm" />
+                    <SmallHealthMetricBox type="spo2" value="92%" />
+                  </View>
+
+                  {/* Large Health Metric Boxes */}
+                  <View style={styles.largeMetricsWrapper}>
+                    <HealthMetricBox type="calories" />
+                  </View>
+                  <View style={styles.largeMetricsWrapper}>
+                    <HealthMetricBox type="hrv" />
+                  </View>
+                  <View style={styles.largeMetricsWrapper}>
+                    <HealthMetricBox type="rhr" />
+                  </View>
+                  <View style={styles.largeMetricsWrapper}>
+                    <HealthMetricBox type="stress" />
+                  </View>
+                  <View style={styles.largeMetricsWrapperLast}>
+                    <HealthMetricBox type="sleep" />
+                  </View>
+                </>
+              ) : (
+                <View style={styles.wearableWrapper}>
+                  <ConnectWearableCard />
+                </View>
+              )}
+            </>
+          )}
+
+          {selectedPeriod !== 'daily' && (
+            <>
+              {/* Week Navigation */}
+              <View style={styles.weekNavigationWrapper}>
+                <WeekNavigation
+                  startDate={new Date(2025, 0, 1)}
+                  endDate={new Date(2025, 2, 24)}
+                  onPreviousPress={() => console.log('Previous')}
+                  onNextPress={() => console.log('Next')}
+                />
               </View>
+
+              {/* Divider */}
+              <View style={styles.divider} />
+
+              {/* Session & Engagement Title */}
+              <Text style={styles.sessionEngagementTitle}>Session & Engagement</Text>
+
+              {/* Session Engagement Card */}
+              <View style={styles.sessionEngagementWrapper}>
+                <SessionEngagementCard
+                  totalHours={36}
+                  avgHoursPerWeek={5}
+                  bookedHours={36}
+                  completedHours={32}
+                  upcomingHours={1}
+                />
+              </View>
+
+              {/* This Week's Goal Title */}
+              <Text style={styles.goalTitle}>This Week's Goal</Text>
+
+              {/* Weekly Goal Status */}
+              <View style={styles.weeklyGoalStatusWrapper}>
+                <WeeklyGoalStatus
+                  completedSessions={4}
+                  goalSessions={4}
+                  status="Met"
+                  message="Goal achieved! Keep the momentum going - book your next session to stay consistent 🔥"
+                />
+              </View>
+
+              {/* Activity Overview Title */}
+              <Text style={styles.activityOverviewTitle}>Activity Overview</Text>
+
+              {/* Session Details Card */}
+              <View style={styles.sessionDetailsWrapper}>
+                <SessionDetailsCard />
+              </View>
+
+              {/* Health Trends or Connect Wearable */}
+              {isDeviceConnected ? (
+                <>
+                  {/* Health Trends Title */}
+                  <Text style={styles.healthTrendsTitle}>Health Trends</Text>
+
+                  {/* Last Sync Text */}
+                  <Text style={styles.lastSyncText}>Last sync at 5:00 PM, 12 Dec 25</Text>
+
+                  {/* Small Health Metric Boxes Row */}
+                  <View style={styles.smallMetricsRow}>
+                    <SmallHealthMetricBox type="steps" value="7200" />
+                    <SmallHealthMetricBox type="heartRate" value="73" unit="bpm" />
+                    <SmallHealthMetricBox type="spo2" value="92%" />
+                  </View>
+
+                  {/* Large Health Metric Boxes */}
+                  <View style={styles.largeMetricsWrapper}>
+                    <HealthMetricBox type="calories" />
+                  </View>
+                  <View style={styles.largeMetricsWrapper}>
+                    <HealthMetricBox type="hrv" />
+                  </View>
+                  <View style={styles.largeMetricsWrapper}>
+                    <HealthMetricBox type="rhr" />
+                  </View>
+                  <View style={styles.largeMetricsWrapper}>
+                    <HealthMetricBox type="stress" />
+                  </View>
+                  <View style={styles.largeMetricsWrapperLast}>
+                    <HealthMetricBox type="sleep" />
+                  </View>
+                </>
+              ) : (
+                <View style={styles.wearableWrapper}>
+                  <ConnectWearableCard />
+                </View>
+              )}
             </>
           )}
         </View>
@@ -202,16 +316,105 @@ const styles = StyleSheet.create({
     gap: scale(10),
   },
   dateHeader: {
-    fontSize: scale(14),
+    fontSize: scale(13),
     fontWeight: '600',
     color: '#000000',
-    marginTop: scale(8),
+    fontFamily: 'SF Pro Text',
+    marginTop: scale(16.64),
+    marginLeft: scale(12),
   },
   weeklyViewWrapper: {
     marginLeft: -scale(8),
     marginRight: -scale(8),
   },
   statsWrapper: {
+    alignItems: 'center',
+  },
+  dailyStatsWrapper: {
+    marginTop: scale(22),
+    marginLeft: -scale(8),
+    marginRight: -scale(8),
+  },
+  goalTitle: {
+    color: '#000000',
+    fontFamily: 'Inter',
+    fontSize: scale(14),
+    fontWeight: '600',
+    marginTop: scale(20),
+    marginLeft: scale(12),
+  },
+  weeklyGoalStatusWrapper: {
+    marginTop: scale(10),
+    alignItems: 'center',
+  },
+  activityOverviewTitle: {
+    color: '#000000',
+    fontFamily: 'SF Pro Text',
+    fontSize: scale(14),
+    fontWeight: '600',
+    marginTop: scale(20),
+    marginLeft: scale(12),
+    alignSelf: 'stretch',
+  },
+  sessionDetailsWrapper: {
+    marginTop: scale(10),
+    alignItems: 'center',
+  },
+  healthTrendsTitle: {
+    color: '#000000',
+    fontFamily: 'Inter',
+    fontSize: scale(14),
+    fontWeight: '600',
+    marginTop: scale(20),
+    marginLeft: scale(12),
+  },
+  lastSyncText: {
+    color: '#999A9E',
+    fontFamily: 'Inter',
+    fontSize: scale(13),
+    fontWeight: '500',
+    lineHeight: scale(17),
+    marginTop: scale(5),
+    marginLeft: scale(12),
+  },
+  smallMetricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: scale(10),
+    marginLeft: scale(12),
+    marginRight: scale(12),
+    gap: scale(7.5),
+  },
+  largeMetricsWrapper: {
+    marginTop: scale(10),
+    alignItems: 'center',
+  },
+  largeMetricsWrapperLast: {
+    marginTop: scale(10),
+    marginBottom: scale(20),
+    alignItems: 'center',
+  },
+  weekNavigationWrapper: {
+    marginTop: scale(16.64),
+    marginBottom: scale(15),
+  },
+  divider: {
+    width: scale(324),
+    height: 1,
+    borderRadius: scale(8),
+    backgroundColor: '#F2F2F2',
+    alignSelf: 'center',
+    marginBottom: scale(15),
+  },
+  sessionEngagementTitle: {
+    color: '#000000',
+    fontFamily: 'SF Pro Text',
+    fontSize: scale(14),
+    fontWeight: '600',
+    marginLeft: scale(12),
+    marginBottom: scale(10),
+  },
+  sessionEngagementWrapper: {
     alignItems: 'center',
   },
   goalSetterWrapper: {
